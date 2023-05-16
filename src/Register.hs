@@ -19,7 +19,12 @@ mkRegFile = do
 ------------------------------------------------------------------------
 
 readRegister :: Z3.MonadZ3 z3 => RegisterFile -> Z3.AST -> z3 Z3.AST
-readRegister (RegisterFile _ regs) index = Z3.mkSelect regs index
+readRegister (RegisterFile _ regs) index = do
+  zero <- mkSymWord32 0
+  cond <- Z3.mkEq index zero
+
+  regRead <- Z3.mkSelect regs index
+  Z3.mkIte cond zero regRead
 
 writeRegister :: Z3.MonadZ3 z3 => RegisterFile -> Z3.AST -> Z3.AST -> z3 RegisterFile
 writeRegister (RegisterFile pc regs) index value = do

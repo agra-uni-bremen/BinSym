@@ -31,7 +31,6 @@ writeRegFile :: Z3.Z3 (Maybe [Integer])
 writeRegFile = do
   regFile <- mkRegFile
   x1 <- mkSymWord32 1
-  value <- readRegister regFile x1
 
   newValue <- mkSymWord32 42
   newRegFile <- writeRegister regFile x1 newValue
@@ -40,12 +39,27 @@ writeRegFile = do
   fmap snd $ Z3.withModel $ \m ->
     catMaybes <$> mapM (Z3.evalBv False m) [readValue]
 
+writeZeroRegister :: Z3.Z3 (Maybe [Integer])
+writeZeroRegister = do
+  regFile <- mkRegFile
+  x0 <- mkSymWord32 0
+
+  newValue <- mkSymWord32 42
+  newRegFile <- writeRegister regFile x0 newValue
+  readValue <- readRegister newRegFile x0
+
+  fmap snd $ Z3.withModel $ \m ->
+    catMaybes <$> mapM (Z3.evalBv False m) [readValue]
+
 registerTests :: TestTree
 registerTests = testGroup "RegisterFile tests"
   [ testCase "Read default register value" $ do
       (Just v) <- Z3.evalZ3 readZeroReg
-      assertEqual "must be zero" v [0]
+      assertEqual "must be zero" [0] v
   , testCase "Write and read register file" $ do
       (Just v) <- Z3.evalZ3 writeRegFile
-      assertEqual "must be 42" v [42]
+      assertEqual "must be 42" [42] v
+  , testCase "Attempt to write the zero register" $ do
+      (Just v) <- Z3.evalZ3 writeZeroRegister
+      assertEqual "must be 0" [0] v
   ]
