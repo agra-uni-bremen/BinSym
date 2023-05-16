@@ -46,9 +46,9 @@ evalE (E.Slt e1 e2)  = binOp e1 e2 Z3.mkBvslt  >>= fromBool
 evalE (E.Sge e1 e2)  = binOp e1 e2 Z3.mkBvsge  >>= fromBool
 evalE (E.Ult e1 e2)  = binOp e1 e2 Z3.mkBvult  >>= fromBool
 evalE (E.Uge e1 e2)  = binOp e1 e2 Z3.mkBvuge  >>= fromBool
-evalE (E.And e1 e2)  = binOp e1 e2 Z3.mkBvand  >>= fromBool
-evalE (E.Or e1 e2)   = binOp e1 e2 Z3.mkBvor   >>= fromBool
-evalE (E.Xor e1 e2)  = binOp e1 e2 Z3.mkBvxor  >>= fromBool
+evalE (E.And e1 e2)  = binOp e1 e2 Z3.mkBvand
+evalE (E.Or e1 e2)   = binOp e1 e2 Z3.mkBvor
+evalE (E.Xor e1 e2)  = binOp e1 e2 Z3.mkBvxor
 evalE (E.LShl e1 e2) = binOp e1 e2 Z3.mkBvshl
 evalE (E.LShr e1 e2) = binOp e1 e2 Z3.mkBvlshr
 evalE (E.AShr e1 e2) = binOp e1 e2 Z3.mkBvashr
