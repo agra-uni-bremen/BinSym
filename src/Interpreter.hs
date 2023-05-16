@@ -33,6 +33,7 @@ evalE :: Z3.MonadZ3 z3 => E.Expr (Z3.AST) -> z3 Z3.AST
 evalE (E.FromImm e) = pure e
 evalE (E.FromUInt v) = mkSymWord32 v
 evalE (E.Add e1 e2) = binOp e1 e2 Z3.mkBvadd
+evalE (E.Sub e1 e2) = binOp e1 e2 Z3.mkBvsub
 evalE _ = error "expression language operation not implemented"
 
 ------------------------------------------------------------------------
