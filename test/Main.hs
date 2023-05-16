@@ -38,6 +38,12 @@ expressionTests = testGroup "Expression language tests"
 
       assertEqual "must not be equal" 0 neq
       assertEqual "must be equal" 1 eq
+  , testCase "Byte sign extension" $ do
+      (Just v) <- Z3.evalZ3 $ do
+        x <- mkSymWord32 0xdeadbeef
+        evalE (E.SExtByte (E.FromImm x)) >>= getInt
+
+      assertEqual "sign extended lsb" 0xffffffef v
   ]
 
 ------------------------------------------------------------------------
