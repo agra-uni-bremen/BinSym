@@ -29,3 +29,5 @@ executable formal-symex
                     , parameterized-utils
                     , libriscv
                     , bv-sized
+                    , array
+                    , freer-simple
