@@ -37,6 +37,7 @@ evalE (E.FromImm e) = pure e
 evalE (E.FromUInt v) = mkSymWord32 v
 evalE (E.Add e1 e2) = binOp e1 e2 Z3.mkBvadd
 evalE (E.Sub e1 e2) = binOp e1 e2 Z3.mkBvsub
+evalE (E.Eq e1 e2) = binOp e1 e2 Z3.mkEq >>= fromBool
 evalE _ = error "expression language operation not implemented"
 
 ------------------------------------------------------------------------

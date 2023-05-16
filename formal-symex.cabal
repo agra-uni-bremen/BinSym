@@ -47,3 +47,4 @@ test-suite test
       , tasty-hunit  ^>= 0.10.0.3
       , z3
       , formal-symex
+      , libriscv
