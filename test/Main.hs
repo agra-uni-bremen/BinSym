@@ -33,8 +33,8 @@ writeRegFile = do
   x1 <- mkSymWord32 1
 
   newValue <- mkSymWord32 42
-  newRegFile <- writeRegister regFile x1 newValue
-  readValue <- readRegister newRegFile x1
+  writeRegister regFile x1 newValue
+  readValue <- readRegister regFile x1
 
   fmap snd $ Z3.withModel $ \m ->
     catMaybes <$> mapM (Z3.evalBv False m) [readValue]
@@ -45,8 +45,8 @@ writeZeroRegister = do
   x0 <- mkSymWord32 0
 
   newValue <- mkSymWord32 42
-  newRegFile <- writeRegister regFile x0 newValue
-  readValue <- readRegister newRegFile x0
+  writeRegister regFile x0 newValue
+  readValue <- readRegister regFile x0
 
   fmap snd $ Z3.withModel $ \m ->
     catMaybes <$> mapM (Z3.evalBv False m) [readValue]
