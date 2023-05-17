@@ -23,6 +23,7 @@ library
     exposed-modules:  Interpreter
                     , Util
                     , Register
+                    , Memory
 
     build-depends:    base ^>=4.17.1.0
                     , z3
