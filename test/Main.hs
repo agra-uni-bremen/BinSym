@@ -1,6 +1,7 @@
 import Test.Tasty
 import Test.Tasty.HUnit
 
+import Memory
 import Interpreter
 import Register
 import Util
@@ -77,4 +78,21 @@ registerTests = testGroup "RegisterFile tests"
         readRegister regFile x0 >>= getInt
 
       assertEqual "writes to zero register are ignored" 0 v
+  ]
+
+------------------------------------------------------------------------
+
+memoryTests :: TestTree
+memoryTests = testGroup "Memory tests"
+  [ testCase "Write and read byte" $ do
+      (Just v) <- Z3.evalZ3 $ do
+        mem <- mkMemory 0x0
+
+        addr  <- mkSymWord32 0x1000
+        value <- mkSymWord8  0xab
+        storeByte mem addr value
+
+        loadByte mem addr >>= getInt
+
+      assertEqual "loaded byte must be 0xab" 0xab v
   ]
