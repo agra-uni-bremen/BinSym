@@ -5,6 +5,11 @@ source-repository-package
     location: git@github.com:nmeum/libriscv.git
     tag: 312138d4a76b63f133e2274c60e53274682a675a
 
+source-repository-package
+    type: git
+    location: https://github.com/murcake/haskell-z3.git
+    tag: 020e2450deca17156f176c41f060043761b656b1
+
 -- The template-haskell version constraint of freer-simple is too strict.
 --
 -- See: https://github.com/lexi-lambda/freer-simple/issues/40#issuecomment-1438089449

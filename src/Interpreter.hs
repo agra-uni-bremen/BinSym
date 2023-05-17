@@ -1,71 +1,64 @@
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TypeFamilies #-}
 module Interpreter where
 
 import Util
+import qualified Register as REG
 
 import Control.Monad.Freer
 import Data.Word (Word32)
 import Data.Array.IO (IOArray)
 import LibRISCV (ByteAddrsMem(..), Address)
 import LibRISCV.Spec.Operations (Operations(..))
-import What4.Concrete (ConcreteVal(..))
+import Control.Monad.IO.Class (liftIO)
 
-import qualified What4.Interface as IF
-import qualified Data.BitVector.Sized as BV
+import qualified Z3.Monad as Z3
 import qualified LibRISCV.Spec.Expr as E
-import qualified LibRISCV.Machine.Register as REG
 import qualified LibRISCV.Machine.Memory as MEM
 
--- Map a binary operation in the LibRISCV expression language to a What4 operation.
-binOp :: (IF.IsExprBuilder sym)
-  => sym
-  -> E.Expr (IF.SymBV sym 32)
-  -> E.Expr (IF.SymBV sym 32)
-  -> (sym -> IF.SymBV sym 32 -> IF.SymBV sym 32 -> IO (IF.SymBV sym 32))
-  -> IO (IF.SymBV sym 32)
-binOp sym e1 e2 op = do
-  bv1 <- runExpression sym e1
-  bv2 <- runExpression sym e2
-  op sym bv1 bv2
+-- Map a binary operation in the LibRISCV expression language to a Z3 operation.
+binOp :: Z3.MonadZ3 z3
+  => E.Expr (Z3.AST)
+  -> E.Expr (Z3.AST)
+  -> (Z3.AST -> Z3.AST -> z3 Z3.AST)
+  -> z3 Z3.AST
+binOp e1 e2 op = do
+  bv1 <- evalE e1
+  bv2 <- evalE e2
+  op bv1 bv2
 
-runExpression :: IF.IsExprBuilder sym
-  => sym
-  -> E.Expr (IF.SymBV sym 32)
-  -> IO (IF.SymBV sym 32)
-runExpression _ (E.FromImm e) = pure e
-runExpression sym (E.FromUInt v) = mkSymWord32 sym v
-runExpression sym (E.Add e1 e2) = binOp sym e1 e2 (IF.bvAdd :: IF.IsExprBuilder sym => sym -> IF.SymBV sym 32 -> IF.SymBV sym 32 -> IO (IF.SymBV sym 32))
-runExpression _ _ = error "expression language operation not implemented"
+evalE :: Z3.MonadZ3 z3 => E.Expr (Z3.AST) -> z3 Z3.AST
+evalE (E.FromImm e) = pure e
+evalE (E.FromUInt v) = mkSymWord32 v
+evalE (E.Add e1 e2) = binOp e1 e2 Z3.mkBvadd
+evalE (E.Sub e1 e2) = binOp e1 e2 Z3.mkBvsub
+evalE _ = error "expression language operation not implemented"
 
 ------------------------------------------------------------------------
 
-type ArchState sym = (REG.RegisterFile IOArray (IF.SymBV sym 32), MEM.Memory IOArray (IF.SymBV sym 32))
+type ArchState = (REG.RegisterFile, MEM.Memory IOArray Z3.AST)
 
--- instance IF.IsExprBuilder sym => ByteAddrsMem (ArchState sym) where
---     storeByteString (_, mem) = MEM.storeByteString mem
+-- instance ByteAddrsMem ArchState where
+--   storeByteString (_, mem) = MEM.storeByteString mem
 
-mkArchState :: IF.IsExprBuilder sym => sym -> Address -> Word32 -> IO (ArchState sym)
-mkArchState sym memStart memSize = do
-    reg <- mkSymWord32 sym 0 >>= REG.mkRegFile
-    mem <- MEM.mkMemory memStart memSize
+mkArchState :: Z3.MonadZ3 z3 => Address -> Word32 -> z3 ArchState
+mkArchState memStart memSize = do
+    reg <- REG.mkRegFile
+    mem <- liftIO $ MEM.mkMemory memStart memSize
     pure (reg, mem)
 
 ------------------------------------------------------------------------
 
-type SymEnv sym = (sym, sym -> E.Expr (IF.SymBV sym 32) -> IO (IF.SymBV sym 32), ArchState sym)
+type SymEnv m = (E.Expr Z3.AST -> m Z3.AST, ArchState)
 
-symBehavior :: IF.IsExprBuilder sym => SymEnv sym -> Operations (IF.SymBV sym 32) ~> IO
-symBehavior (sym, evalE, (regFile, _mem)) = \case
-  ReadRegister idx -> do
-    bv <- evalE sym $ E.FromImm idx
-    case IF.asConcrete bv of
-      Just (ConcreteBV _ v) -> REG.readRegister regFile (toEnum (fromIntegral (BV.asUnsigned v)))
-      _                     -> error "register index is not concrete"
-  _ -> error "operation is not implemented"
+symBehavior :: Z3.MonadZ3 z3 => SymEnv z3 -> Operations (Z3.AST) ~> z3
+symBehavior (eval, (regFile, _mem)) = \case
+  ReadRegister idx -> REG.readRegister regFile idx
+  WriteRegister idx val -> eval val >>= REG.writeRegister regFile idx
+  WritePC newPC -> eval newPC >>= REG.writePC regFile
+  ReadPC -> REG.readPC regFile

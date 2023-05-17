@@ -15,19 +15,32 @@ build-type:         Simple
 common warnings
     ghc-options: -Wall
 
-executable formal-symex
+library
     import:           warnings
-    main-is:          Main.hs
     hs-source-dirs:   src
     default-language: Haskell2010
 
-    other-modules:    Util
-                    , Interpreter
+    exposed-modules:  Interpreter
+                    , Util
+                    , Register
 
     build-depends:    base ^>=4.17.1.0
-                    , what4 ^>=1.4
-                    , parameterized-utils
+                    , z3
                     , libriscv
                     , bv-sized
                     , array
                     , freer-simple
+                    , conversion
+
+test-suite test
+    import:           warnings
+    default-language: Haskell2010
+    type:             exitcode-stdio-1.0
+    hs-source-dirs:   test
+    main-is:          Main.hs
+    build-depends:
+        base          >= 4.15.0.0
+      , tasty        ^>= 1.4.2.3
+      , tasty-hunit  ^>= 0.10.0.3
+      , z3
+      , formal-symex
