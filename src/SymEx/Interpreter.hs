@@ -77,9 +77,19 @@ symBehavior (eval, (regFile, mem)) = \case
   ReadRegister idx -> REG.readRegister regFile idx
   WriteRegister idx val -> eval val >>= REG.writeRegister regFile idx
   LoadByte addr -> evalE addr >>= MEM.loadByte mem
+  LoadHalf addr -> evalE addr >>= MEM.loadHalf mem
+  LoadWord addr -> evalE addr >>= MEM.loadWord mem
   StoreByte addr value -> do
     a <- evalE addr
     v <- evalE value
     MEM.storeByte mem a v
+  StoreHalf addr value -> do
+    a <- evalE addr
+    v <- evalE value
+    MEM.storeHalf mem a v
+  StoreWord addr value -> do
+    a <- evalE addr
+    v <- evalE value
+    MEM.storeWord mem a v
   WritePC newPC -> eval newPC >>= REG.writePC regFile
   ReadPC -> REG.readPC regFile
