@@ -18,6 +18,7 @@ tests = testGroup "Tests"
   [
     registerTests
   , expressionTests
+  , memoryTests
   ]
 
 ------------------------------------------------------------------------
