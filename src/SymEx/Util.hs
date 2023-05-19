@@ -1,6 +1,7 @@
 module SymEx.Util where
 
 import Control.Exception (assert)
+import Control.Monad (foldM)
 import Data.Word (Word32, Word8)
 import qualified Z3.Monad as Z3
 
@@ -24,7 +25,12 @@ fromBool boolAst = do
   sort <- Z3.getSort boolAst >>= Z3.getSortKind
   assert (sort == Z3.Z3_BOOL_SORT) (fromBool' boolAst)
   where
-    fromBool' boolAst = do
+    fromBool' boolAst' = do
       trueBV <- mkSymWord32 1
       falseBV <- mkSymWord32 0
-      Z3.mkIte boolAst trueBV falseBV
+      Z3.mkIte boolAst' trueBV falseBV
+
+-- A combination of foldM and foldl1.
+foldM1 :: (Monad m) => (a -> a -> m a) -> [a] -> m a
+foldM1 _ [] = error "empty list"
+foldM1 f (x : xs) = foldM f x xs

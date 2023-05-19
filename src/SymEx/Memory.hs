@@ -41,7 +41,12 @@ loadByte m a = bvSize a >>= \s -> assert (s == 32) loadByte' m a
       ary <- liftIO $ readIORef aryRef
       toMemAddr mem addr >>= Z3.mkSelect ary
 
--- TODO: Zero extend the byte to a word?
+load :: (Z3.MonadZ3 z3) => Memory -> Z3.AST -> Word32 -> z3 Z3.AST
+load mem addr numBytes = do
+  bytes <-
+    mapM (\off -> mkSymWord32 off >>= Z3.mkBvadd addr >>= loadByte mem) $
+      assert (numBytes >= 1) [0 .. (numBytes - 1)]
+  foldM1 (\acc byte -> Z3.mkConcat byte acc) bytes
 
 storeByte :: (Z3.MonadZ3 z3) => Memory -> Z3.AST -> Z3.AST -> z3 ()
 storeByte m a v = do
@@ -54,3 +59,14 @@ storeByte m a v = do
       new <- toMemAddr mem addr >>= \ra -> Z3.mkStore ary ra value
 
       liftIO $ writeIORef aryRef new
+
+store :: (Z3.MonadZ3 z3) => Memory -> Z3.AST -> Z3.AST -> z3 ()
+store mem addr value = do
+  byteSize <- bvSize value >>= \s -> assert (s `mod` 8 == 0) (pure $ s `div` 8)
+  bytes <-
+    mapM
+      (\n -> Z3.mkExtract ((n * 8) - 1) ((n - 1) * 8) value)
+      (reverse [1 .. byteSize])
+
+  mapM_ (\(off, byte) -> mkSymWord32 off >>= Z3.mkBvadd addr >>= \a -> storeByte mem a byte) $
+    zip [0 ..] bytes
