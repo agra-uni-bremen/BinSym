@@ -7,6 +7,7 @@
 
 module SymEx.Interpreter where
 
+import Control.Exception (assert)
 import Control.Monad.Freer
 import LibRISCV (Address, ByteAddrsMem (..))
 import qualified LibRISCV.Spec.Expr as E
@@ -27,10 +28,18 @@ binOp e1 e2 op = do
 evalE :: Z3.MonadZ3 z3 => E.Expr Z3.AST -> z3 Z3.AST
 evalE (E.FromImm e)  = pure e
 evalE (E.FromUInt v) = mkSymWord32 v
-evalE (E.ZExtByte v) = evalE v -- Z3 zero extends to 32-bit by default
-evalE (E.ZExtHalf v) = evalE v -- Z3 zero extends to 32-bit by default
-evalE (E.SExtHalf v) = evalE v >>= Z3.mkExtract 15 0 >>= Z3.mkSignExt 16
-evalE (E.SExtByte v) = evalE v >>= Z3.mkExtract 7 0  >>= Z3.mkSignExt 24
+evalE (E.ZExtByte v) = do
+  bv <- evalE v
+  bvSize bv >>= \s -> assert (s == 8)  $ Z3.mkZeroExt 24 bv
+evalE (E.ZExtHalf v) = do
+  bv <- evalE v
+  bvSize bv >>= \s -> assert (s == 16) $ Z3.mkZeroExt 16 bv
+evalE (E.SExtByte v) = do
+  bv <- evalE v
+  bvSize bv >>= \s -> assert (s == 8)  $ Z3.mkExtract 7 0 bv  >>= Z3.mkSignExt 24
+evalE (E.SExtHalf v) = do
+  bv <- evalE v
+  bvSize bv >>= \s -> assert (s == 16) $ Z3.mkExtract 15 0 bv >>= Z3.mkSignExt 16
 evalE (E.Add e1 e2)  = binOp e1 e2 Z3.mkBvadd
 evalE (E.Sub e1 e2)  = binOp e1 e2 Z3.mkBvsub
 evalE (E.Eq e1 e2)   = binOp e1 e2 Z3.mkEq     >>= fromBool
