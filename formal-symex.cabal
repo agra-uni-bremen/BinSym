@@ -41,6 +41,9 @@ test-suite test
     main-is:          Main.hs
 
     other-modules:    Util
+                    , Memory
+                    , Register
+                    , Expr
 
     build-depends:
         base          >= 4.15.0.0
