@@ -1,4 +1,4 @@
-module SymEx.Memory where
+module SymEx.Memory (Memory, mkMemory, loadByte, loadHalf, loadWord, storeByte, storeHalf, storeWord) where
 
 import Control.Exception (assert)
 import Control.Monad.IO.Class (liftIO)
@@ -8,8 +8,8 @@ import SymEx.Util
 import qualified Z3.Monad as Z3
 
 data Memory = Memory
-  { start :: Z3.AST,
-    array :: IORef Z3.AST
+  { _start :: Z3.AST,
+    _array :: IORef Z3.AST
   }
 
 mkMemory :: (Z3.MonadZ3 z3) => Word32 -> z3 Memory
@@ -48,6 +48,12 @@ load mem addr numBytes = do
       assert (numBytes >= 1) [0 .. (numBytes - 1)]
   foldM1 (\acc byte -> Z3.mkConcat byte acc) bytes
 
+loadHalf :: (Z3.MonadZ3 z3) => Memory -> Z3.AST -> z3 Z3.AST
+loadHalf m a = load m a 16
+
+loadWord :: (Z3.MonadZ3 z3) => Memory -> Z3.AST -> z3 Z3.AST
+loadWord m a = load m a 32
+
 storeByte :: (Z3.MonadZ3 z3) => Memory -> Z3.AST -> Z3.AST -> z3 ()
 storeByte m a v = do
   addrSize <- bvSize a
@@ -66,7 +72,13 @@ store mem addr value = do
   bytes <-
     mapM
       (\n -> Z3.mkExtract ((n * 8) - 1) ((n - 1) * 8) value)
-      (reverse [1 .. byteSize])
+      [1 .. byteSize]
 
   mapM_ (\(off, byte) -> mkSymWord32 off >>= Z3.mkBvadd addr >>= \a -> storeByte mem a byte) $
     zip [0 ..] bytes
+
+storeHalf :: (Z3.MonadZ3 z3) => Memory -> Z3.AST -> Z3.AST -> z3 ()
+storeHalf m a v = bvSize a >>= \s -> assert (s == 16) $ store m a v
+
+storeWord :: (Z3.MonadZ3 z3) => Memory -> Z3.AST -> Z3.AST -> z3 ()
+storeWord m a v = bvSize a >>= \s -> assert (s == 32) $ store m a v
