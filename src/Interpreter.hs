@@ -68,8 +68,13 @@ mkArchState memStart = do
 type SymEnv m = (E.Expr Z3.AST -> m Z3.AST, ArchState)
 
 symBehavior :: Z3.MonadZ3 z3 => SymEnv z3 -> Operations (Z3.AST) ~> z3
-symBehavior (eval, (regFile, _mem)) = \case
+symBehavior (eval, (regFile, mem)) = \case
   ReadRegister idx -> REG.readRegister regFile idx
   WriteRegister idx val -> eval val >>= REG.writeRegister regFile idx
+  LoadByte addr -> evalE addr >>= MEM.loadByte mem
+  StoreByte addr value -> do
+    a <- evalE addr
+    v <- evalE value
+    MEM.storeByte mem a v
   WritePC newPC -> eval newPC >>= REG.writePC regFile
   ReadPC -> REG.readPC regFile
