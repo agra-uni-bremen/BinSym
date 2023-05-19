@@ -1,11 +1,11 @@
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Memory
-import Interpreter
-import Register
+import SymEx.Memory
+import SymEx.Interpreter
+import SymEx.Register
+import SymEx.Util
 import Util
-import TestUtils
 
 import qualified Z3.Monad as Z3
 import qualified LibRISCV.Spec.Expr as E

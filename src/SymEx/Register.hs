@@ -1,6 +1,6 @@
-module Register where
+module SymEx.Register where
 
-import Util
+import SymEx.Util
 
 import qualified Z3.Monad as Z3
 import Control.Monad.IO.Class (liftIO)

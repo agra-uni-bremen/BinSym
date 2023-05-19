@@ -20,10 +20,10 @@ library
     hs-source-dirs:   src
     default-language: Haskell2010
 
-    exposed-modules:  Interpreter
-                    , Util
-                    , Register
-                    , Memory
+    exposed-modules:  SymEx.Interpreter
+                    , SymEx.Util
+                    , SymEx.Register
+                    , SymEx.Memory
 
     build-depends:    base ^>=4.17.1.0
                     , z3
@@ -40,7 +40,7 @@ test-suite test
     hs-source-dirs:   test
     main-is:          Main.hs
 
-    other-modules:    TestUtils
+    other-modules:    Util
 
     build-depends:
         base          >= 4.15.0.0

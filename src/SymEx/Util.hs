@@ -1,4 +1,4 @@
-module Util where
+module SymEx.Util where
 
 import Data.Word (Word8, Word32)
 import Control.Exception (assert)

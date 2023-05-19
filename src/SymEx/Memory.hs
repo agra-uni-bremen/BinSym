@@ -1,6 +1,6 @@
-module Memory where
+module SymEx.Memory where
 
-import Util
+import SymEx.Util
 
 import Data.Word (Word32)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)

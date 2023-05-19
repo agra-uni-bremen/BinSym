@@ -5,11 +5,11 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
-module Interpreter where
+module SymEx.Interpreter where
 
-import Util
-import qualified Register as REG
-import qualified Memory as MEM
+import SymEx.Util
+import qualified SymEx.Register as REG
+import qualified SymEx.Memory as MEM
 
 import Control.Monad.Freer
 import LibRISCV (ByteAddrsMem(..), Address)
