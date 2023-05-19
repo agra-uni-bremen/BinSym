@@ -9,17 +9,14 @@ module Interpreter where
 
 import Util
 import qualified Register as REG
+import qualified Memory as MEM
 
 import Control.Monad.Freer
-import Data.Word (Word32)
-import Data.Array.IO (IOArray)
 import LibRISCV (ByteAddrsMem(..), Address)
 import LibRISCV.Spec.Operations (Operations(..))
-import Control.Monad.IO.Class (liftIO)
 
 import qualified Z3.Monad as Z3
 import qualified LibRISCV.Spec.Expr as E
-import qualified LibRISCV.Machine.Memory as MEM
 
 -- Map a binary operation in the LibRISCV expression language to a Z3 operation.
 binOp :: Z3.MonadZ3 z3
@@ -55,15 +52,15 @@ evalE (E.AShr e1 e2) = binOp e1 e2 Z3.mkBvashr
 
 ------------------------------------------------------------------------
 
-type ArchState = (REG.RegisterFile, MEM.Memory IOArray Z3.AST)
+type ArchState = (REG.RegisterFile, MEM.Memory)
 
 -- instance ByteAddrsMem ArchState where
 --   storeByteString (_, mem) = MEM.storeByteString mem
 
-mkArchState :: Z3.MonadZ3 z3 => Address -> Word32 -> z3 ArchState
-mkArchState memStart memSize = do
+mkArchState :: Z3.MonadZ3 z3 => Address -> z3 ArchState
+mkArchState memStart = do
     reg <- REG.mkRegFile
-    mem <- liftIO $ MEM.mkMemory memStart memSize
+    mem <- MEM.mkMemory memStart
     pure (reg, mem)
 
 ------------------------------------------------------------------------
