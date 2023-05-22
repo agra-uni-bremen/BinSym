@@ -1,4 +1,4 @@
-module SymEx.Util (mkSymWord8, mkSymWord32, bvSize, fromBool, foldM1) where
+module SymEx.Util (mkSymWord8, mkSymWord32, getWord32, bvSize, fromBool, foldM1) where
 
 import Control.Exception (assert)
 import Control.Monad (foldM)
@@ -12,6 +12,13 @@ mkSymWord8 w = Z3.mkBitvector 8 (fromIntegral w)
 -- Create a symbolic bitvector from a 'Word32'.
 mkSymWord32 :: (Z3.MonadZ3 z3) => Word32 -> z3 Z3.AST
 mkSymWord32 w = Z3.mkBitvector 32 (fromIntegral w)
+
+-- Extract a Word32 from a Z3 bit-vector.
+getWord32 :: (Z3.MonadZ3 z3) => Z3.AST -> z3 Word32
+getWord32 ast =
+  bvSize ast >>= \s ->
+    assert (s == 32) $
+      (fromIntegral <$> Z3.getInt ast)
 
 -- Obtain the size for a bit-vector will crash
 -- if the given value is not a Z3 bit-vector.

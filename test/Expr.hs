@@ -28,6 +28,12 @@ expressionTests =
 
         assertEqual "must not be equal" 0 neq
         assertEqual "must be equal" 1 eq,
+      testCase "Extract constant" $ do
+        v <- Z3.evalZ3 $ do
+          w <- mkSymWord32 42
+          evalE (E.FromImm w) >>= getWord32
+
+        assertEqual "" 42 v,
       testCase "Byte sign extension" $ do
         (Just v) <- Z3.evalZ3 $ do
           x <- mkSymWord32 0xdeadbeef

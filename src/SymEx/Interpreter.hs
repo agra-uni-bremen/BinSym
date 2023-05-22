@@ -8,10 +8,14 @@
 module SymEx.Interpreter where
 
 import Control.Exception (assert)
+import Control.Monad (when)
 import Control.Monad.Freer
+import Control.Monad.IO.Class (liftIO)
 import LibRISCV (Address, ByteAddrsMem (..))
+import qualified LibRISCV.Decoder.Instruction as I
 import qualified LibRISCV.Spec.Expr as E
 import LibRISCV.Spec.Operations (Operations (..))
+import SymEx.Cond
 import qualified SymEx.Memory as MEM
 import qualified SymEx.Register as REG
 import SymEx.Util
@@ -73,7 +77,28 @@ mkArchState memStart = do
 type SymEnv m = (E.Expr Z3.AST -> m Z3.AST, ArchState)
 
 symBehavior :: (Z3.MonadZ3 z3) => SymEnv z3 -> Operations Z3.AST ~> z3
-symBehavior (eval, (regFile, mem)) = \case
+symBehavior env@(eval, (regFile, mem)) = \case
+  DecodeRS1 inst -> I.mkRs1 <$> getWord32 inst >>= mkSymWord32
+  DecodeRS2 inst -> I.mkRs2 <$> getWord32 inst >>= mkSymWord32
+  DecodeRD inst -> I.mkRd <$> getWord32 inst >>= mkSymWord32
+  DecodeImmB inst -> I.immB <$> getWord32 inst >>= mkSymWord32
+  DecodeImmS inst -> I.immS <$> getWord32 inst >>= mkSymWord32
+  DecodeImmU inst -> I.immU <$> getWord32 inst >>= mkSymWord32
+  DecodeImmI inst -> I.immI <$> getWord32 inst >>= mkSymWord32
+  DecodeImmJ inst -> I.immJ <$> getWord32 inst >>= mkSymWord32
+  DecodeShamt inst -> I.mkShamt <$> getWord32 inst >>= mkSymWord32
+  RunIf cond next -> do
+    c <- evalE cond >>= makeCond True
+    mayBeTrue <- checkCond c
+    when mayBeTrue $ do
+      assertCond c
+      symBehavior env next
+  RunUnless cond next -> do
+    c <- evalE cond >>= makeCond False
+    mayBeFalse <- checkCond c
+    when mayBeFalse $ do
+      assertCond c
+      symBehavior env next
   ReadRegister idx -> REG.readRegister regFile idx
   WriteRegister idx val -> eval val >>= REG.writeRegister regFile idx
   LoadByte addr -> evalE addr >>= MEM.loadByte mem
@@ -93,3 +118,7 @@ symBehavior (eval, (regFile, mem)) = \case
     MEM.storeWord mem a v
   WritePC newPC -> eval newPC >>= REG.writePC regFile
   ReadPC -> REG.readPC regFile
+  Exception _ msg -> error "runtime exception" msg
+  Ecall _ -> liftIO $ putStrLn "ECALL"
+  Ebreak _ -> liftIO $ putStrLn "EBREAK"
+  Append__ s s' -> symBehavior env s >> symBehavior env s'
