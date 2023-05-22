@@ -24,7 +24,7 @@ main'' (BasicArgs memAddr memSize trace putReg fp) = do
   entry <- (liftIO $ startAddr elf) >>= mkSymWord32
 
   -- TODO: Tracing
-  let interpreter = runReader (evalE, state) . runInstruction symBehavior . runNoLogging
+  let interpreter = runReader (evalE @Z3.Z3, state) . runInstruction symBehavior . runNoLogging
   runM $ interpreter (buildAST @Z3.AST entry)
 
   -- TODO: dump register values
