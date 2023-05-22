@@ -24,6 +24,7 @@ library
                     , SymEx.Util
                     , SymEx.Register
                     , SymEx.Memory
+                    , SymEx.Cond
 
     build-depends:    base ^>=4.17.1.0
                     , z3

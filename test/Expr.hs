@@ -1,6 +1,7 @@
 module Expr where
 
 import qualified LibRISCV.Spec.Expr as E
+import SymEx.Cond
 import SymEx.Interpreter
 import SymEx.Util
 import Test.Tasty
@@ -39,8 +40,8 @@ expressionTests =
           y <- mkSymWord32 5
 
           eq <- evalE (E.Eq (E.FromImm x) (E.FromImm y))
-          f <- mayBeTrue eq
-          s <- mayBeFalse eq
+          f <- makeCond True eq >>= checkCond
+          s <- makeCond False eq >>= checkCond
           pure (f, s)
 
         assertEqual "must be true" True (fst res)
