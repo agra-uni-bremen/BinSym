@@ -1,3 +1,5 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -10,8 +12,9 @@ module SymEx.Interpreter where
 import Control.Exception (assert)
 import Control.Monad (when)
 import Control.Monad.Freer
+import Control.Monad.Freer.Reader (Reader, ask)
 import Control.Monad.IO.Class (liftIO)
-import LibRISCV (Address, ByteAddrsMem (..))
+import LibRISCV (Address)
 import qualified LibRISCV.Decoder.Instruction as I
 import qualified LibRISCV.Spec.Expr as E
 import LibRISCV.Spec.Operations (Operations (..))
@@ -63,9 +66,6 @@ evalE (E.AShr e1 e2) = binOp e1 e2 Z3.mkBvashr
 
 type ArchState = (REG.RegisterFile, MEM.Memory)
 
--- instance ByteAddrsMem ArchState where
---   storeByteString (_, mem) = MEM.storeByteString mem
-
 mkArchState :: (Z3.MonadZ3 z3) => Address -> z3 ArchState
 mkArchState memStart = do
   reg <- REG.mkRegFile
@@ -75,6 +75,15 @@ mkArchState memStart = do
 ------------------------------------------------------------------------
 
 type SymEnv m = (E.Expr Z3.AST -> m Z3.AST, ArchState)
+
+runInstruction ::
+  forall r m effs env mem.
+  (Z3.MonadZ3 m, Member (Reader env) effs, LastMember m effs) =>
+  (env -> Operations mem ~> m) ->
+  Eff (Operations mem ': effs) r ->
+  Eff effs r
+runInstruction f eff =
+  ask >>= \env -> interpretM (f env) eff
 
 symBehavior :: (Z3.MonadZ3 z3) => SymEnv z3 -> Operations Z3.AST ~> z3
 symBehavior env@(eval, (regFile, mem)) = \case

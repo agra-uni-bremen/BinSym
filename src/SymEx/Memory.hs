@@ -1,9 +1,11 @@
-module SymEx.Memory (Memory, mkMemory, loadByte, loadHalf, loadWord, storeByte, storeHalf, storeWord) where
+module SymEx.Memory (Memory, mkMemory, loadByte, loadHalf, loadWord, storeByte, storeHalf, storeWord, storeByteString) where
 
 import Control.Exception (assert)
 import Control.Monad.IO.Class (liftIO)
+import qualified Data.ByteString.Lazy as BSL
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Word (Word32)
+import LibRISCV (Address)
 import SymEx.Util
 import qualified Z3.Monad as Z3
 
@@ -82,3 +84,14 @@ storeHalf m a v = bvSize a >>= \s -> assert (s == 16) $ store m a v
 
 storeWord :: (Z3.MonadZ3 z3) => Memory -> Z3.AST -> Z3.AST -> z3 ()
 storeWord m a v = bvSize a >>= \s -> assert (s == 32) $ store m a v
+
+storeByteString :: (Z3.MonadZ3 z3) => Memory -> Address -> BSL.ByteString -> z3 ()
+storeByteString mem addr bs = do
+  startAddr <- mkSymWord32 addr
+  mapM_
+    ( \(off, byte) -> do
+        v <- mkSymWord8 byte
+        mkSymWord32 off >>= Z3.mkBvadd startAddr >>= \a -> storeByte mem a v
+    )
+    $ zip [0 ..]
+    $ BSL.unpack bs
