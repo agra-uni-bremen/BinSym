@@ -32,5 +32,17 @@ expressionTests =
           x <- mkSymWord32 0xdeadbeef
           evalE (E.SExtByte (E.FromImm x)) >>= getInt
 
-        assertEqual "sign extended lsb" 0xffffffef v
+        assertEqual "sign extended lsb" 0xffffffef v,
+      testCase "Check statisfability" $ do
+        res <- Z3.evalZ3 $ do
+          x <- mkSymWord32 5
+          y <- mkSymWord32 5
+
+          eq <- evalE (E.Eq (E.FromImm x) (E.FromImm y))
+          f <- mayBeTrue eq
+          s <- mayBeFalse eq
+          pure (f, s)
+
+        assertEqual "must be true" True (fst res)
+        assertEqual "must not be false" False (snd res)
     ]
