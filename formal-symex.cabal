@@ -29,10 +29,7 @@ library
     build-depends:    base ^>=4.17.1.0
                     , z3
                     , libriscv
-                    , bv-sized
-                    , array
                     , freer-simple
-                    , conversion
 
 test-suite test
     import:           warnings
