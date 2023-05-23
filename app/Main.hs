@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Main where
@@ -16,7 +17,7 @@ import SymEx.Memory (storeByteString)
 import SymEx.Util (mkSymWord32)
 import qualified Z3.Monad as Z3
 
-main'' :: (Z3.MonadZ3 z3) => BasicArgs -> z3 ()
+main'' :: forall z3. (Z3.MonadZ3 z3) => BasicArgs -> z3 ()
 main'' (BasicArgs memAddr memSize trace putReg fp) = do
   state@(_, mem) <- mkArchState memAddr
   elf <- liftIO $ readElf fp
@@ -24,7 +25,7 @@ main'' (BasicArgs memAddr memSize trace putReg fp) = do
   entry <- (liftIO $ startAddr elf) >>= mkSymWord32
 
   -- TODO: Tracing
-  let interpreter = runReader (evalE @Z3.Z3, state) . runInstruction symBehavior . runNoLogging
+  let interpreter = runReader (evalE @z3, state) . runInstruction symBehavior . runNoLogging
   runM $ interpreter (buildAST @Z3.AST entry)
 
   -- TODO: dump register values
