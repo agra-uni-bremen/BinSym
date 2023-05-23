@@ -8,7 +8,7 @@ import Control.Monad.Freer (runM)
 import Control.Monad.Freer.Reader (runReader)
 import Control.Monad.IO.Class (liftIO)
 import LibRISCV.CmdLine (BasicArgs (BasicArgs), basicArgs)
-import LibRISCV.Effects.Logging.InstructionFetch (runNoLogging)
+import LibRISCV.Effects.Logging.InstructionFetch (runLogInstructionFetchM, runNoLogging)
 import LibRISCV.Loader (loadElf, readElf, startAddr)
 import LibRISCV.Spec.AST (buildAST)
 import Options.Applicative
@@ -18,7 +18,7 @@ import SymEx.Util (mkSymWord32)
 import qualified Z3.Monad as Z3
 
 main'' :: forall z3. (Z3.MonadZ3 z3) => BasicArgs -> z3 ()
-main'' (BasicArgs memAddr _memSize _trace putReg fp) = do
+main'' (BasicArgs memAddr _memSize trace putReg fp) = do
   state@(_, mem) <- mkArchState memAddr
 
   elf <- liftIO $ readElf fp
@@ -26,9 +26,12 @@ main'' (BasicArgs memAddr _memSize _trace putReg fp) = do
   entry <- (liftIO $ startAddr elf) >>= mkSymWord32
 
   -- TODO: Tracing
-  let interpreter = runReader (evalE @z3, state) . runInstruction symBehavior . runNoLogging
-  runM $ interpreter (buildAST @Z3.AST entry)
+  let interpreter =
+        if trace
+          then runReader (evalE @z3, state) . runInstruction symBehavior . runLogInstructionFetchM
+          else runReader (evalE @z3, state) . runInstruction symBehavior . runNoLogging
 
+  runM $ interpreter (buildAST @Z3.AST entry)
   when putReg $
     dumpState state
 
