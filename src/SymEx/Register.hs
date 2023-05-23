@@ -2,6 +2,9 @@ module SymEx.Register where
 
 import Control.Monad.IO.Class (liftIO)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
+import Data.Word (Word32)
+import LibRISCV (RegIdx)
+import Numeric (showHex)
 import SymEx.Util
 import qualified Z3.Monad as Z3
 
@@ -22,6 +25,20 @@ mkRegFile = do
   regRef <- liftIO $ newIORef regsArray
 
   pure $ RegisterFile pcRef regRef
+
+dumpRegs :: (Z3.MonadZ3 z3) => RegisterFile -> z3 String
+dumpRegs regFile =
+  -- TODO: Show program counter value too
+  foldl (\acc (r, v) -> show r ++ "\t= 0x" ++ ((showHex v) "\n") ++ acc) "" <$> getRegs
+  where
+    getRegs :: (Z3.MonadZ3 z3) => z3 [(RegIdx, Word32)]
+    getRegs =
+      mapM
+        ( \reg -> do
+            x <- mkSymWord32 (fromIntegral $ fromEnum reg) >>= readRegister regFile >>= getWord32
+            pure (reg, x)
+        )
+        $ [(minBound :: RegIdx) .. maxBound]
 
 ------------------------------------------------------------------------
 
