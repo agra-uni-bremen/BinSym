@@ -3,12 +3,11 @@
 
 module Main where
 
-import Control.Monad (when)
-import Control.Monad.Freer (Eff, runM)
+import Control.Monad.Freer (runM)
 import Control.Monad.Freer.Reader (runReader)
 import Control.Monad.IO.Class (liftIO)
-import LibRISCV.CmdLine (BasicArgs (..), basicArgs)
-import LibRISCV.Effects.Logging.InstructionFetch (runLogInstructionFetchM, runNoLogging)
+import LibRISCV.CmdLine (BasicArgs (BasicArgs), basicArgs)
+import LibRISCV.Effects.Logging.InstructionFetch (runNoLogging)
 import LibRISCV.Loader (loadElf, readElf, startAddr)
 import LibRISCV.Spec.AST (buildAST)
 import Options.Applicative
@@ -18,8 +17,9 @@ import SymEx.Util (mkSymWord32)
 import qualified Z3.Monad as Z3
 
 main'' :: forall z3. (Z3.MonadZ3 z3) => BasicArgs -> z3 ()
-main'' (BasicArgs memAddr memSize trace putReg fp) = do
+main'' (BasicArgs memAddr _memSize _trace _putReg fp) = do
   state@(_, mem) <- mkArchState memAddr
+
   elf <- liftIO $ readElf fp
   loadElf elf $ storeByteString mem
   entry <- (liftIO $ startAddr elf) >>= mkSymWord32

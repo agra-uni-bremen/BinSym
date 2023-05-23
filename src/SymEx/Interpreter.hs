@@ -113,6 +113,10 @@ symBehavior env@(eval, (regFile, mem)) = \case
   LoadByte addr -> evalE addr >>= MEM.loadByte mem
   LoadHalf addr -> evalE addr >>= MEM.loadHalf mem
   LoadWord addr -> evalE addr >>= MEM.loadWord mem
+  LoadInstr addr -> do
+    x <- evalE addr >>= MEM.loadWord mem
+    w <- getWord32 x
+    pure (w, x)
   StoreByte addr value -> do
     a <- evalE addr
     v <- evalE value
