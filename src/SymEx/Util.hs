@@ -18,7 +18,7 @@ getWord32 :: (Z3.MonadZ3 z3) => Z3.AST -> z3 Word32
 getWord32 ast =
   bvSize ast >>= \s ->
     assert (s == 32) $
-      (fromIntegral <$> Z3.getInt ast)
+      (fromIntegral <$> (Z3.simplify ast >>= Z3.getInt))
 
 -- Obtain the size for a bit-vector will crash
 -- if the given value is not a Z3 bit-vector.
