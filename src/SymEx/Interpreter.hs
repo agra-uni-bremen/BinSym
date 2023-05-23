@@ -72,6 +72,10 @@ mkArchState memStart = do
   mem <- MEM.mkMemory memStart
   pure (reg, mem)
 
+dumpState :: (Z3.MonadZ3 z3) => ArchState -> z3 ()
+dumpState (r, _) = do
+  REG.dumpRegs r >>= liftIO . putStr
+
 ------------------------------------------------------------------------
 
 type SymEnv m = (E.Expr Z3.AST -> m Z3.AST, ArchState)
