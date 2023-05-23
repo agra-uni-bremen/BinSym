@@ -3,6 +3,7 @@
 
 module Main where
 
+import Control.Monad (when)
 import Control.Monad.Freer (runM)
 import Control.Monad.Freer.Reader (runReader)
 import Control.Monad.IO.Class (liftIO)
@@ -17,7 +18,7 @@ import SymEx.Util (mkSymWord32)
 import qualified Z3.Monad as Z3
 
 main'' :: forall z3. (Z3.MonadZ3 z3) => BasicArgs -> z3 ()
-main'' (BasicArgs memAddr _memSize _trace _putReg fp) = do
+main'' (BasicArgs memAddr _memSize _trace putReg fp) = do
   state@(_, mem) <- mkArchState memAddr
 
   elf <- liftIO $ readElf fp
@@ -28,8 +29,8 @@ main'' (BasicArgs memAddr _memSize _trace _putReg fp) = do
   let interpreter = runReader (evalE @z3, state) . runInstruction symBehavior . runNoLogging
   runM $ interpreter (buildAST @Z3.AST entry)
 
-  -- TODO: dump register values
-  pure ()
+  when putReg $
+    dumpState state
 
 main' :: BasicArgs -> IO ()
 main' args = Z3.evalZ3 (main'' args)
