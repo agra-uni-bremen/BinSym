@@ -51,10 +51,10 @@ load mem addr numBytes = do
   foldM1 (\acc byte -> Z3.mkConcat byte acc) bytes
 
 loadHalf :: (Z3.MonadZ3 z3) => Memory -> Z3.AST -> z3 Z3.AST
-loadHalf m a = load m a 16
+loadHalf m a = load m a 2
 
 loadWord :: (Z3.MonadZ3 z3) => Memory -> Z3.AST -> z3 Z3.AST
-loadWord m a = load m a 32
+loadWord m a = load m a 4
 
 storeByte :: (Z3.MonadZ3 z3) => Memory -> Z3.AST -> Z3.AST -> z3 ()
 storeByte m a v = do
