@@ -25,7 +25,6 @@ main'' (BasicArgs memAddr _memSize trace putReg fp) = do
   loadElf elf $ storeByteString mem
   entry <- (liftIO $ startAddr elf) >>= mkSymWord32
 
-  -- TODO: Tracing
   let interpreter =
         if trace
           then runReader (evalE @z3, state) . runInstruction symBehavior . runLogInstructionFetchM
