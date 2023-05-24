@@ -43,10 +43,10 @@ evalE (E.ZExtHalf v) = do
   bvSize bv >>= \s -> assert (s == 16) $ Z3.mkZeroExt 16 bv
 evalE (E.SExtByte v) = do
   bv <- evalE v
-  bvSize bv >>= \s -> assert (s == 8)  $ Z3.mkExtract 7 0 bv  >>= Z3.mkSignExt 24
+  bvSize bv >>= \s -> assert (s == 8)  $ Z3.mkSignExt 24 bv
 evalE (E.SExtHalf v) = do
   bv <- evalE v
-  bvSize bv >>= \s -> assert (s == 16) $ Z3.mkExtract 15 0 bv >>= Z3.mkSignExt 16
+  bvSize bv >>= \s -> assert (s == 16) $ Z3.mkSignExt 16 bv
 evalE (E.Add e1 e2)  = binOp e1 e2 Z3.mkBvadd
 evalE (E.Sub e1 e2)  = binOp e1 e2 Z3.mkBvsub
 evalE (E.Eq e1 e2)   = binOp e1 e2 Z3.mkEq     >>= fromBool

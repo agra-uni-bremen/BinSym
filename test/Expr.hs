@@ -36,7 +36,7 @@ expressionTests =
         assertEqual "" 42 v,
       testCase "Byte sign extension" $ do
         (Just v) <- Z3.evalZ3 $ do
-          x <- mkSymWord32 0xdeadbeef
+          x <- mkSymWord8 0xef
           evalE (E.SExtByte (E.FromImm x)) >>= getInt
 
         assertEqual "sign extended lsb" 0xffffffef v,
