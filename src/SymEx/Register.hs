@@ -29,7 +29,7 @@ mkRegFile = do
 dumpRegs :: (Z3.MonadZ3 z3) => RegisterFile -> z3 String
 dumpRegs regFile =
   -- TODO: Show program counter value too
-  foldl (\acc (r, v) -> show r ++ "\t= 0x" ++ ((showHex v) "\n") ++ acc) "" <$> getRegs
+  foldl (\acc (r, v) -> acc ++ show r ++ "\t= 0x" ++ ((showHex v) "\n")) "" <$> getRegs
   where
     getRegs :: (Z3.MonadZ3 z3) => z3 [(RegIdx, Word32)]
     getRegs =
