@@ -15,10 +15,7 @@ mkSymWord32 w = Z3.mkBitvector 32 (fromIntegral w)
 
 -- Extract a Word32 from a Z3 bit-vector.
 getWord32 :: (Z3.MonadZ3 z3) => Z3.AST -> z3 Word32
-getWord32 ast =
-  bvSize ast >>= \s ->
-    assert (s == 32) $
-      (fromIntegral <$> (Z3.simplify ast >>= Z3.getInt))
+getWord32 ast = fromIntegral <$> Z3.getInt ast
 
 -- Obtain the size for a bit-vector will crash
 -- if the given value is not a Z3 bit-vector.
