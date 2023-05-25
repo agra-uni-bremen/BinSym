@@ -10,6 +10,7 @@ import Control.Monad.IO.Class (liftIO)
 import LibRISCV.CmdLine (BasicArgs (BasicArgs), basicArgs)
 import LibRISCV.Effects.Logging.InstructionFetch (runLogInstructionFetchM, runNoLogging)
 import LibRISCV.Loader (loadElf, readElf, startAddr)
+import LibRISCV.Machine.Interpreter (runInstruction)
 import LibRISCV.Spec.AST (buildAST)
 import Options.Applicative
 import SymEx.Interpreter

@@ -80,15 +80,6 @@ dumpState (r, _) = do
 
 type SymEnv m = (E.Expr Z3.AST -> m Z3.AST, ArchState)
 
-runInstruction ::
-  forall r m effs env mem.
-  (Z3.MonadZ3 m, Member (Reader env) effs, LastMember m effs) =>
-  (env -> Operations mem ~> m) ->
-  Eff (Operations mem ': effs) r ->
-  Eff effs r
-runInstruction f eff =
-  ask >>= \env -> interpretM (f env) eff
-
 symBehavior :: (Z3.MonadZ3 z3) => SymEnv z3 -> Operations Z3.AST ~> z3
 symBehavior env@(eval, (regFile, mem)) = \case
   DecodeRS1 inst -> I.mkRs1 <$> getWord32 inst >>= mkSymWord32
