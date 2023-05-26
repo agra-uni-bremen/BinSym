@@ -20,7 +20,7 @@ import qualified Z3.Monad as Z3
 
 main'' :: forall z3. (Z3.MonadZ3 z3) => BasicArgs -> z3 ()
 main'' (BasicArgs memAddr _memSize trace putReg fp) = do
-  state@(_, mem) <- mkArchState memAddr
+  state@(_, mem, _) <- mkArchState memAddr
 
   elf <- liftIO $ readElf fp
   loadElf elf $ storeByteString mem

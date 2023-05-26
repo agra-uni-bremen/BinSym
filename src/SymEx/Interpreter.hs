@@ -12,8 +12,9 @@ module SymEx.Interpreter where
 import Control.Exception (assert)
 import Control.Monad (when)
 import Control.Monad.Freer
-import Control.Monad.Freer.Reader (Reader, ask)
 import Control.Monad.IO.Class (liftIO)
+import Data.IORef (IORef, newIORef, readIORef, writeIORef)
+import Data.Word (Word32)
 import LibRISCV (Address)
 import qualified LibRISCV.Decoder.Instruction as I
 import qualified LibRISCV.Spec.Expr as E
@@ -64,16 +65,17 @@ evalE (E.AShr e1 e2) = binOp e1 e2 Z3.mkBvashr
 
 ------------------------------------------------------------------------
 
-type ArchState = (REG.RegisterFile, MEM.Memory)
+type ArchState = (REG.RegisterFile, MEM.Memory, IORef Word32)
 
 mkArchState :: (Z3.MonadZ3 z3) => Address -> z3 ArchState
 mkArchState memStart = do
   reg <- REG.mkRegFile
   mem <- MEM.mkMemory memStart
-  pure (reg, mem)
+  instr <- liftIO $ newIORef (0 :: Word32)
+  pure (reg, mem, instr)
 
 dumpState :: (Z3.MonadZ3 z3) => ArchState -> z3 ()
-dumpState (r, _) = do
+dumpState (r, _, _) = do
   REG.dumpRegs r >>= liftIO . putStr
 
 ------------------------------------------------------------------------
@@ -81,16 +83,16 @@ dumpState (r, _) = do
 type SymEnv m = (E.Expr Z3.AST -> m Z3.AST, ArchState)
 
 symBehavior :: (Z3.MonadZ3 z3) => SymEnv z3 -> Operations Z3.AST ~> z3
-symBehavior env@(eval, (regFile, mem)) = \case
-  DecodeRS1 inst -> I.mkRs1 <$> getWord32 inst >>= mkSymWord32
-  DecodeRS2 inst -> I.mkRs2 <$> getWord32 inst >>= mkSymWord32
-  DecodeRD inst -> I.mkRd <$> getWord32 inst >>= mkSymWord32
-  DecodeImmB inst -> I.immB <$> getWord32 inst >>= mkSymWord32
-  DecodeImmS inst -> I.immS <$> getWord32 inst >>= mkSymWord32
-  DecodeImmU inst -> I.immU <$> getWord32 inst >>= mkSymWord32
-  DecodeImmI inst -> I.immI <$> getWord32 inst >>= mkSymWord32
-  DecodeImmJ inst -> I.immJ <$> getWord32 inst >>= mkSymWord32
-  DecodeShamt inst -> I.mkShamt <$> getWord32 inst >>= mkSymWord32
+symBehavior env@(eval, (regFile, mem, instr)) = \case
+  DecodeRS1 _ -> I.mkRs1 <$> (liftIO $ readIORef instr) >>= mkSymWord32
+  DecodeRS2 _ -> I.mkRs2 <$> (liftIO $ readIORef instr) >>= mkSymWord32
+  DecodeRD _ -> I.mkRd <$> (liftIO $ readIORef instr) >>= mkSymWord32
+  DecodeImmB _ -> I.immB <$> (liftIO $ readIORef instr) >>= mkSymWord32
+  DecodeImmS _ -> I.immS <$> (liftIO $ readIORef instr) >>= mkSymWord32
+  DecodeImmU _ -> I.immU <$> (liftIO $ readIORef instr) >>= mkSymWord32
+  DecodeImmI _ -> I.immI <$> (liftIO $ readIORef instr) >>= mkSymWord32
+  DecodeImmJ _ -> I.immJ <$> (liftIO $ readIORef instr) >>= mkSymWord32
+  DecodeShamt _ -> I.mkShamt <$> (liftIO $ readIORef instr) >>= mkSymWord32
   RunIf cond next -> do
     c <- evalE cond >>= makeCond True
     mayBeTrue <- checkCond c
@@ -111,6 +113,7 @@ symBehavior env@(eval, (regFile, mem)) = \case
   LoadInstr addr -> do
     x <- evalE addr >>= MEM.loadWord mem >>= Z3.simplify
     w <- getWord32 x
+    liftIO $ writeIORef instr w
     pure (w, x)
   StoreByte addr value -> do
     a <- evalE addr
