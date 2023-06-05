@@ -21,6 +21,9 @@ data Concolic a
       a -- Concrete value
       (Maybe Z3.AST) -- Symbolic value (bit-vector)
 
+instance Functor Concolic where
+  fmap fn (MkConcolic c s) = MkConcolic (fn c) s
+
 -- Create a concrete concolic value, i.e. a value without a symbolic part.
 mkConcrete :: (FiniteBits a) => a -> Concolic a
 mkConcrete v = MkConcolic v Nothing
