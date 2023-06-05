@@ -1,4 +1,4 @@
-module SymEx.Concolic (Concolic, mkConcrete, mkSymbolic, getConcrete, getSymbolic, concretize, evalE) where
+module SymEx.Concolic (Concolic, mkConcrete, mkSymbolic, getConcrete, getSymbolic, mkUncons, concretize, evalE) where
 
 import Control.Exception (assert)
 import Data.Maybe (fromMaybe, isJust)
@@ -27,6 +27,15 @@ mkConcrete w = MkConcolic w Nothing
 -- Create a concolic value with a symbolic part.
 mkSymbolic :: Word32 -> Z3.AST -> Concolic
 mkSymbolic c s = MkConcolic c (Just s)
+
+-- Create a concolic value with an unconstrained symbolic part.
+--
+-- TODO: Set the concrete part to a random value.
+mkUncons :: (Z3.MonadZ3 z3) => String -> z3 Concolic
+mkUncons name = do
+  symbol <- Z3.mkStringSymbol name
+  -- TODO: Choose a random value for the concrete part.
+  mkSymbolic 0 <$> Z3.mkBvVar symbol 32
 
 -- Extract the concrete part of a concolic value. Emits an error if the
 -- concolic value has a symbolic part, use 'concretize' if you cannot
