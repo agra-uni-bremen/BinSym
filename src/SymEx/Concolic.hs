@@ -1,6 +1,7 @@
 module SymEx.Concolic (Concolic, mkConcrete, mkSymbolic, getConcrete, getSymbolic, mkUncons, concretize, evalE) where
 
 import Control.Exception (assert)
+import Data.Bits (FiniteBits, finiteBitSize)
 import Data.Maybe (fromMaybe, isJust)
 import Data.Word (Word32)
 import qualified LibRISCV.Machine.Interpreter as I
@@ -15,45 +16,43 @@ import qualified Z3.Monad as Z3
 -- SMT bit-vector (as represented by the Haskell Z3 bindings).
 --
 -- See also: https://en.wikipedia.org/wiki/Concolic_testing
-data Concolic
+data Concolic a
   = MkConcolic
-      Word32 -- Concrete value
+      a -- Concrete value
       (Maybe Z3.AST) -- Symbolic value (bit-vector)
 
 -- Create a concrete concolic value, i.e. a value without a symbolic part.
-mkConcrete :: Word32 -> Concolic
-mkConcrete w = MkConcolic w Nothing
+mkConcrete :: (FiniteBits a) => a -> Concolic a
+mkConcrete v = MkConcolic v Nothing
 
 -- Create a concolic value with a symbolic part.
-mkSymbolic :: Word32 -> Z3.AST -> Concolic
+mkSymbolic :: (FiniteBits a) => a -> Z3.AST -> Concolic a
 mkSymbolic c s = MkConcolic c (Just s)
 
 -- Create a concolic value with an unconstrained symbolic part.
---
--- TODO: Set the concrete part to a random value.
-mkUncons :: (Z3.MonadZ3 z3) => String -> z3 Concolic
-mkUncons name = do
+mkUncons :: (Z3.MonadZ3 z3, FiniteBits a) => a -> String -> z3 (Concolic a)
+mkUncons initial name = do
   symbol <- Z3.mkStringSymbol name
-  -- TODO: Choose a random value for the concrete part.
-  mkSymbolic 0 <$> Z3.mkBvVar symbol 32
+  mkSymbolic initial <$> Z3.mkBvVar symbol (finiteBitSize initial)
 
 -- Extract the concrete part of a concolic value. Emits an error if the
 -- concolic value has a symbolic part, use 'concretize' if you cannot
 -- guarantee that this is never the case.
-getConcrete :: Concolic -> Word32
+getConcrete :: (FiniteBits a) => Concolic a -> a
 getConcrete (MkConcolic w Nothing) = w
 getConcrete (MkConcolic _ (Just _)) = error "getConcrete" "concolic value has symbolic part"
 
 -- Extract the optional symbolic part of a concolic value.
-getSymbolic :: Concolic -> Maybe Z3.AST
+getSymbolic :: Concolic a -> Maybe Z3.AST
 getSymbolic (MkConcolic _ s) = s
 
 -- Concretize the concolic value.
-concretize :: (Z3.MonadZ3 z3) => Concolic -> z3 Word32
+concretize :: (Z3.MonadZ3 z3, Integral a, FiniteBits a) => Concolic a -> z3 a
 concretize (MkConcolic w Nothing) = pure w
 concretize (MkConcolic w (Just s)) = do
-  bvSize s >>= \sz -> assert (sz == 32) $ do
-    eq <- mkSymWord32 w >>= \w' -> Z3.mkEq s w'
+  let concSz = finiteBitSize w
+  bvSize s >>= \sz -> assert (sz == concSz) $ do
+    eq <- Z3.mkBitvector concSz (fromIntegral w) >>= \w' -> Z3.mkEq s w'
     Z3.assert eq
     Z3.check >>= \r -> assert (fromResult r) (pure w)
 
@@ -64,14 +63,16 @@ concretize (MkConcolic w (Just s)) = do
 -- LibRISCV.Machine.Interpreter for the concrete part of the concolic
 -- value. For the symbolic part, the evalE implementation from the
 -- SymEx.Symbolic module is used.
+--
+-- The expression language is only implemented on 'Concolic Word32'.
 
 -- Perform an unary LibRISCV Expr operation on a concolic value.
 unaryOp ::
   (Z3.MonadZ3 z3) =>
-  E.Expr Concolic ->
+  E.Expr (Concolic Word32) ->
   (E.Expr Word32 -> E.Expr Word32) ->
   (E.Expr Z3.AST -> E.Expr Z3.AST) ->
-  z3 Concolic
+  z3 (Concolic Word32)
 unaryOp e fnConc fnSym = do
   (MkConcolic c s) <- evalE e
 
@@ -85,11 +86,11 @@ unaryOp e fnConc fnSym = do
 -- Perform a binary LibRISCV Expr operation on a concolic value.
 binaryOp ::
   (Z3.MonadZ3 z3) =>
-  E.Expr Concolic ->
-  E.Expr Concolic ->
+  E.Expr (Concolic Word32) ->
+  E.Expr (Concolic Word32) ->
   (E.Expr Word32 -> E.Expr Word32 -> E.Expr Word32) ->
   (E.Expr Z3.AST -> E.Expr Z3.AST -> E.Expr Z3.AST) ->
-  z3 Concolic
+  z3 (Concolic Word32)
 binaryOp e1 e2 fnConc fnSym = do
   (MkConcolic c1 s1) <- evalE e1
   (MkConcolic c2 s2) <- evalE e2
@@ -106,7 +107,7 @@ binaryOp e1 e2 fnConc fnSym = do
 
 {- ORMOLU_DISABLE -}
 -- Evaluate a LibRISCV expression on a 'Concolic' value.
-evalE :: Z3.MonadZ3 z3 => E.Expr Concolic -> z3 Concolic
+evalE :: Z3.MonadZ3 z3 => E.Expr (Concolic Word32) -> z3 (Concolic Word32)
 evalE (E.FromImm e)  = pure e
 evalE (E.FromUInt v) = pure $ mkConcrete v
 evalE (E.ZExtByte e) = unaryOp e E.ZExtByte E.ZExtByte
