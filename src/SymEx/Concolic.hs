@@ -1,4 +1,4 @@
-module SymEx.Concolic (Concolic, mkConcrete, mkSymbolic, hasSymbolic, getConcrete, getSymbolic, mkUncons, concretize, evalE) where
+module SymEx.Concolic (Concolic, mkConcrete, mkSymbolic, hasSymbolic, getConcrete, getSymbolic, getSymbolicDef, mkUncons, concretize, evalE) where
 
 import Control.Exception (assert)
 import Data.Bits (FiniteBits, finiteBitSize)
@@ -54,6 +54,13 @@ getConcrete (MkConcolic _ (Just _)) = error "getConcrete" "concolic value has sy
 getSymbolic :: Concolic a -> Maybe Z3.AST
 getSymbolic (MkConcolic _ s) = s
 
+-- Return a symbolic value for the concolic value, if the concolic value
+-- doesn't have a symbolic part then it's concrete part is converted to
+-- a Z3 bit-vector instead.
+getSymbolicDef :: (Z3.MonadZ3 z3, Integral a, FiniteBits a) => Concolic a -> z3 Z3.AST
+getSymbolicDef (MkConcolic c s) = do
+  flip fromMaybe s <$> Z3.mkBitvector (finiteBitSize c) (fromIntegral c)
+
 -- Concretize the concolic value.
 concretize :: (Z3.MonadZ3 z3, Integral a, FiniteBits a) => Concolic a -> z3 a
 concretize (MkConcolic w Nothing) = pure w
@@ -100,16 +107,16 @@ binaryOp ::
   (E.Expr Z3.AST -> E.Expr Z3.AST -> E.Expr Z3.AST) ->
   z3 (Concolic Word32)
 binaryOp e1 e2 fnConc fnSym = do
-  (MkConcolic c1 s1) <- evalE e1
-  (MkConcolic c2 s2) <- evalE e2
+  conc1@(MkConcolic c1 _) <- evalE e1
+  conc2@(MkConcolic c2 _) <- evalE e2
 
   let concrete = I.runExpression (fnConc (E.FromImm c1) (E.FromImm c2))
-  if isJust s1 || isJust s2
+  if hasSymbolic conc1 || hasSymbolic conc2
     then do
-      sym1 <- flip fromMaybe s1 <$> mkSymWord32 c1
-      sym2 <- flip fromMaybe s2 <$> mkSymWord32 c2
+      s1 <- getSymbolicDef conc1
+      s2 <- getSymbolicDef conc2
 
-      symbolic <- Just <$> S.evalE (fnSym (E.FromImm sym1) (E.FromImm sym2))
+      symbolic <- Just <$> S.evalE (fnSym (E.FromImm s1) (E.FromImm s2))
       pure $ MkConcolic concrete symbolic
     else pure $ MkConcolic concrete Nothing
 
