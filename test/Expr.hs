@@ -2,7 +2,7 @@ module Expr where
 
 import qualified LibRISCV.Spec.Expr as E
 import SymEx.Cond
-import SymEx.Interpreter
+import SymEx.Symbolic (evalE)
 import SymEx.Util
 import Test.Tasty
 import Test.Tasty.HUnit

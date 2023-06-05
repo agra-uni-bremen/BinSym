@@ -25,6 +25,7 @@ library
                     , SymEx.Register
                     , SymEx.Memory
                     , SymEx.Cond
+                    , SymEx.Symbolic
 
     build-depends:    base ^>=4.17.1.0
                     , z3

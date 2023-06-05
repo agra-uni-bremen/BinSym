@@ -15,6 +15,7 @@ import LibRISCV.Spec.AST (buildAST)
 import Options.Applicative
 import SymEx.Interpreter
 import SymEx.Memory (storeByteString)
+import SymEx.Symbolic (evalE)
 import SymEx.Util (mkSymWord32)
 import qualified Z3.Monad as Z3
 
