@@ -1,5 +1,6 @@
 module Main where
 
+import ConcolicExpr
 import Memory
 import Register
 import SymbolicExpr
@@ -14,5 +15,6 @@ tests =
     "Tests"
     [ registerTests,
       symbolicTests,
+      concolicTests,
       memoryTests
     ]

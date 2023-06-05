@@ -1,45 +1,72 @@
-module SymEx.Concolic (Concolic, mkConcrete, evalE) where
+module SymEx.Concolic (Concolic, mkConcrete, mkSymbolic, getConcrete, getSymbolic, evalE) where
 
-import Data.Maybe (isJust, fromMaybe)
-import SymEx.Util (mkSymWord32)
+import Data.Maybe (fromMaybe, isJust)
 import Data.Word (Word32)
-import qualified Z3.Monad as Z3
-import qualified SymEx.Symbolic as S
-import qualified LibRISCV.Spec.Expr as E
 import qualified LibRISCV.Machine.Interpreter as I
+import qualified LibRISCV.Spec.Expr as E
+import qualified SymEx.Symbolic as S
+import SymEx.Util (mkSymWord32)
+import qualified Z3.Monad as Z3
 
 -- Concolic is a tuple of a concrete value (as represented by
 -- LibRISCV.Machine.Interpreter) and an optional symbolic value as an
 -- SMT bit-vector (as represented by the Haskell Z3 bindings).
 --
 -- See also: https://en.wikipedia.org/wiki/Concolic_testing
-data Concolic = MkConcolic
-                  Word32         -- Concrete value
-                  (Maybe Z3.AST) -- Symbolic value (bit-vector)
+data Concolic
+  = MkConcolic
+      Word32 -- Concrete value
+      (Maybe Z3.AST) -- Symbolic value (bit-vector)
 
 -- Create a concrete concolic value, i.e. a value without a symbolic part.
 mkConcrete :: Word32 -> Concolic
 mkConcrete w = MkConcolic w Nothing
 
--- Create a concolic value with an unconstrained symbolic value.
--- TODO: Requires random number generator (e.g. System.Random).
--- mkSymbolic :: Concolic
--- mkSymbolic = 
+-- Create a concolic value with a symbolic part.
+mkSymbolic :: Word32 -> Z3.AST -> Concolic
+mkSymbolic c s = MkConcolic c (Just s)
+
+-- Extract the concrete part of a concolic value.
+getConcrete :: Concolic -> Word32
+getConcrete (MkConcolic w _) = w
+
+-- Extract the optional symbolic part of a concolic value.
+getSymbolic :: Concolic -> Maybe Z3.AST
+getSymbolic (MkConcolic _ s) = s
 
 ------------------------------------------------------------------------
 
-unaryOp :: Z3.MonadZ3 z3 => E.Expr Concolic -> (E.Expr Word32 -> E.Expr Word32) -> (E.Expr Z3.AST -> E.Expr Z3.AST) -> z3 Concolic
+-- Implementation of the LibRISCV expression language on concolic value.
+-- The implementation re-uses the existing implementation of the
+-- LibRISCV.Machine.Interpreter for the concrete part of the concolic
+-- value. For the symbolic part, the evalE implementation from the
+-- SymEx.Symbolic module is used.
+
+-- Perform an unary LibRISCV Expr operation on a concolic value.
+unaryOp ::
+  (Z3.MonadZ3 z3) =>
+  E.Expr Concolic ->
+  (E.Expr Word32 -> E.Expr Word32) ->
+  (E.Expr Z3.AST -> E.Expr Z3.AST) ->
+  z3 Concolic
 unaryOp e fnConc fnSym = do
   (MkConcolic c s) <- evalE e
 
   let concrete = I.runExpression (fnConc (E.FromImm c))
   symbolic <- case s of
-    Just x  -> Just <$> S.evalE (fnSym (E.FromImm x))
+    Just x -> Just <$> S.evalE (fnSym (E.FromImm x))
     Nothing -> pure Nothing
 
   pure $ MkConcolic concrete symbolic
 
-binaryOp :: Z3.MonadZ3 z3 => E.Expr Concolic -> E.Expr Concolic -> (E.Expr Word32 -> E.Expr Word32 -> E.Expr Word32) -> (E.Expr Z3.AST -> E.Expr Z3.AST -> E.Expr Z3.AST) -> z3 Concolic
+-- Perform a binary LibRISCV Expr operation on a concolic value.
+binaryOp ::
+  (Z3.MonadZ3 z3) =>
+  E.Expr Concolic ->
+  E.Expr Concolic ->
+  (E.Expr Word32 -> E.Expr Word32 -> E.Expr Word32) ->
+  (E.Expr Z3.AST -> E.Expr Z3.AST -> E.Expr Z3.AST) ->
+  z3 Concolic
 binaryOp e1 e2 fnConc fnSym = do
   (MkConcolic c1 s1) <- evalE e1
   (MkConcolic c2 s2) <- evalE e2
@@ -55,6 +82,7 @@ binaryOp e1 e2 fnConc fnSym = do
     else pure $ MkConcolic concrete Nothing
 
 {- ORMOLU_DISABLE -}
+-- Evaluate a LibRISCV expression on a 'Concolic' value.
 evalE :: Z3.MonadZ3 z3 => E.Expr Concolic -> z3 Concolic
 evalE (E.FromImm e)  = pure e
 evalE (E.FromUInt v) = pure $ mkConcrete v
