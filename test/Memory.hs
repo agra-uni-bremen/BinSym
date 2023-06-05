@@ -1,5 +1,6 @@
 module Memory where
 
+import SymEx.Concolic
 import SymEx.Memory
 import SymEx.Util
 import Test.Tasty
@@ -12,41 +13,54 @@ memoryTests =
   testGroup
     "Memory tests"
     [ testCase "Write and read byte" $ do
-        (Just v) <- Z3.evalZ3 $ do
-          mem <- mkMemory 0x0
+        (c, s) <- Z3.evalZ3 $ do
+          mem <- mkMemory 0x0 512
 
-          addr <- mkSymWord32 0x1000
-          value <- mkSymWord8 0xab
-          storeByte mem addr value
+          value <- mkSymbolic 0xab <$> mkSymWord8 0xab
+          storeByte mem 0x0 value
 
-          loadByte mem addr >>= getInt
+          loadByte mem 0x0 >>= concPair
 
-        assertEqual "loaded byte must be 0xab" 0xab v,
+        assertEqual "concrete part" 0xab c
+        assertEqual "symbolic part" 0xab s,
       testCase "Write and read word" $ do
-        (Just v) <- Z3.evalZ3 $ do
-          mem <- mkMemory 0x0
+        (c, s) <- Z3.evalZ3 $ do
+          mem <- mkMemory 0x0 4
 
-          addr <- mkSymWord32 0x0
-          value <- mkSymWord32 0xdeadbeef
-          storeWord mem addr value
+          value <- mkSymbolic 0xdeadbeef <$> mkSymWord32 0xdeadbeef
+          storeWord mem 0x0 value
 
-          loadWord mem addr >>= getInt
+          loadWord mem 0x0 >>= concPair
 
-        assertEqual "" 0xdeadbeef v,
+        assertEqual "concrete part" 0xdeadbeef c
+        assertEqual "symbolic part" 0xdeadbeef s,
       testCase "Load individual bytes of word" $ do
-        (Just v) <- Z3.evalZ3 $ do
-          mem <- mkMemory 0x0
+        lst <- Z3.evalZ3 $ do
+          mem <- mkMemory 0x32 64
 
-          addr <- mkSymWord32 0x0
-          value <- mkSymWord32 0xdeadbeef
-          storeWord mem addr value
+          value <- mkSymbolic 0xdeadbeef <$> mkSymWord32 0xdeadbeef
+          storeWord mem 0x32 value
 
-          b0 <- mkSymWord32 0x0 >>= loadByte mem
-          b1 <- mkSymWord32 0x1 >>= loadByte mem
-          b2 <- mkSymWord32 0x2 >>= loadByte mem
-          b3 <- mkSymWord32 0x3 >>= loadByte mem
+          concs <- mapM (\off -> loadByte mem (0x32 + off)) [0 .. 3]
+          mapM concPair concs
 
-          getInts [b0, b1, b2, b3]
+        assertEqual "" [(0xef, 0xef), (0xbe, 0xbe), (0xad, 0xad), (0xde, 0xde)] lst,
+      testCase "Single symbolic byte in word" $ do
+        (c, s) <- Z3.evalZ3 $ do
+          mem <- mkMemory 0x0 4
 
-        assertEqual "" [0xef, 0xbe, 0xad, 0xde] v
+          let b0 = mkConcrete 0xde
+          let b1 = mkConcrete 0xad
+          b2 <- mkSymbolic 0xbe <$> mkSymWord8 0xff
+          let b3 = mkConcrete 0xef
+
+          storeByte mem 0x0 b3
+          storeByte mem 0x1 b2
+          storeByte mem 0x2 b1
+          storeByte mem 0x3 b0
+
+          loadWord mem 0x0 >>= concPair
+
+        assertEqual "concrete part" 0xdeadbeef c
+        assertEqual "symbolic part" 0xdeadffef s
     ]

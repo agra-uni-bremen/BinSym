@@ -22,7 +22,6 @@ library
 
     exposed-modules:  SymEx.Interpreter
                     , SymEx.Util
-                    , SymEx.Register
                     , SymEx.Memory
                     , SymEx.Cond
                     , SymEx.Symbolic
@@ -33,6 +32,7 @@ library
                     , libriscv
                     , freer-simple
                     , bytestring
+                    , array
 
 executable riscv-symex
     import:               warnings
@@ -56,7 +56,6 @@ test-suite test
 
     other-modules:    Util
                     , Memory
-                    , Register
                     , SymbolicExpr
                     , ConcolicExpr
 

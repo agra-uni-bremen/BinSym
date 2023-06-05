@@ -1,4 +1,4 @@
-module SymEx.Cond (Condition, makeCond, checkCond, assertCond) where
+module SymEx.Cond (Condition, makeCond, checkCond, assertCond, fromResult) where
 
 import Control.Exception (assert)
 import Data.Word (Word32)

@@ -2,7 +2,6 @@ module Main where
 
 import ConcolicExpr
 import Memory
-import Register
 import SymbolicExpr
 import Test.Tasty
 
@@ -13,8 +12,7 @@ tests :: TestTree
 tests =
   testGroup
     "Tests"
-    [ registerTests,
-      symbolicTests,
+    [ symbolicTests,
       concolicTests,
       memoryTests
     ]
