@@ -1,4 +1,4 @@
-module Expr where
+module SymbolicExpr where
 
 import qualified LibRISCV.Spec.Expr as E
 import SymEx.Cond
@@ -9,10 +9,10 @@ import Test.Tasty.HUnit
 import Util
 import qualified Z3.Monad as Z3
 
-expressionTests :: TestTree
-expressionTests =
+symbolicTests :: TestTree
+symbolicTests =
   testGroup
-    "Expression language tests"
+    "Symbolic expression language tests"
     [ testCase "Equality expression" $ do
         (Just neq) <- Z3.evalZ3 $ do
           x <- mkSymWord32 42

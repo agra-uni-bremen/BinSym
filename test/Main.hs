@@ -1,8 +1,8 @@
 module Main where
 
-import Expr
 import Memory
 import Register
+import SymbolicExpr
 import Test.Tasty
 
 main :: IO ()
@@ -13,6 +13,6 @@ tests =
   testGroup
     "Tests"
     [ registerTests,
-      expressionTests,
+      symbolicTests,
       memoryTests
     ]

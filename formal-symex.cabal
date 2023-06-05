@@ -56,7 +56,7 @@ test-suite test
     other-modules:    Util
                     , Memory
                     , Register
-                    , Expr
+                    , SymbolicExpr
 
     build-depends:
         base          >= 4.15.0.0
