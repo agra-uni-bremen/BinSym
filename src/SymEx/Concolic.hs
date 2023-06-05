@@ -1,4 +1,4 @@
-module SymEx.Concolic (Concolic, mkConcrete, mkSymbolic, getConcrete, getSymbolic, mkUncons, concretize, evalE) where
+module SymEx.Concolic (Concolic, mkConcrete, mkSymbolic, hasSymbolic, getConcrete, getSymbolic, mkUncons, concretize, evalE) where
 
 import Control.Exception (assert)
 import Data.Bits (FiniteBits, finiteBitSize)
@@ -37,6 +37,11 @@ mkUncons :: (Z3.MonadZ3 z3, FiniteBits a) => a -> String -> z3 (Concolic a)
 mkUncons initial name = do
   symbol <- Z3.mkStringSymbol name
   mkSymbolic initial <$> Z3.mkBvVar symbol (finiteBitSize initial)
+
+-- True if the concolic value has a symbolic part.
+hasSymbolic :: Concolic a -> Bool
+hasSymbolic (MkConcolic _ Nothing) = False
+hasSymbolic (MkConcolic _ (Just _)) = True
 
 -- Extract the concrete part of a concolic value. Emits an error if the
 -- concolic value has a symbolic part, use 'concretize' if you cannot
