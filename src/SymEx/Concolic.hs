@@ -1,11 +1,13 @@
-module SymEx.Concolic (Concolic, mkConcrete, mkSymbolic, getConcrete, getSymbolic, evalE) where
+module SymEx.Concolic (Concolic, mkConcrete, mkSymbolic, getConcrete, getSymbolic, concretize, evalE) where
 
+import Control.Exception (assert)
 import Data.Maybe (fromMaybe, isJust)
 import Data.Word (Word32)
 import qualified LibRISCV.Machine.Interpreter as I
 import qualified LibRISCV.Spec.Expr as E
+import SymEx.Cond (fromResult)
 import qualified SymEx.Symbolic as S
-import SymEx.Util (mkSymWord32)
+import SymEx.Util (bvSize, mkSymWord32)
 import qualified Z3.Monad as Z3
 
 -- Concolic is a tuple of a concrete value (as represented by
@@ -26,13 +28,25 @@ mkConcrete w = MkConcolic w Nothing
 mkSymbolic :: Word32 -> Z3.AST -> Concolic
 mkSymbolic c s = MkConcolic c (Just s)
 
--- Extract the concrete part of a concolic value.
+-- Extract the concrete part of a concolic value. Emits an error if the
+-- concolic value has a symbolic part, use 'concretize' if you cannot
+-- guarantee that this is never the case.
 getConcrete :: Concolic -> Word32
-getConcrete (MkConcolic w _) = w
+getConcrete (MkConcolic w Nothing) = w
+getConcrete (MkConcolic _ (Just _)) = error "getConcrete" "concolic value has symbolic part"
 
 -- Extract the optional symbolic part of a concolic value.
 getSymbolic :: Concolic -> Maybe Z3.AST
 getSymbolic (MkConcolic _ s) = s
+
+-- Concretize the concolic value.
+concretize :: (Z3.MonadZ3 z3) => Concolic -> z3 Word32
+concretize (MkConcolic w Nothing) = pure w
+concretize (MkConcolic w (Just s)) = do
+  bvSize s >>= \sz -> assert (sz == 32) $ do
+    eq <- mkSymWord32 w >>= \w' -> Z3.mkEq s w'
+    Z3.assert eq
+    Z3.check >>= \r -> assert (fromResult r) (pure w)
 
 ------------------------------------------------------------------------
 
