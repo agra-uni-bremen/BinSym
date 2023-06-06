@@ -1,4 +1,4 @@
-module SymEx.Concolic (Concolic, mkConcrete, mkSymbolic, hasSymbolic, getConcrete, getSymbolic, getSymbolicDef, mkUncons, concretize, evalE) where
+module SymEx.Concolic (Concolic (..), mkConcolic, mkConcrete, mkSymbolic, hasSymbolic, getConcrete, getSymbolic, getSymbolicDef, mkUncons, concretize, evalE) where
 
 import Control.Exception (assert)
 import Data.Bits (FiniteBits, finiteBitSize)
@@ -23,6 +23,10 @@ data Concolic a
 
 instance Functor Concolic where
   fmap fn (MkConcolic c s) = MkConcolic (fn c) s
+
+-- Create a new concolic value.
+mkConcolic :: a -> Maybe Z3.AST -> Concolic a
+mkConcolic = MkConcolic
 
 -- Create a concrete concolic value, i.e. a value without a symbolic part.
 mkConcrete :: (FiniteBits a) => a -> Concolic a
