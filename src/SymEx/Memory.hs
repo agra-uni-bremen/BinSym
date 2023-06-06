@@ -15,7 +15,7 @@ where
 import Control.Exception (assert)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Array.IO (IOArray, MArray (newArray), readArray, writeArray)
-import Data.Bits (finiteBitSize)
+import Data.Bits (FiniteBits, finiteBitSize)
 import qualified Data.ByteString.Lazy as BSL
 import Data.Word (Word16, Word32, Word8)
 import LibRISCV (Address)
@@ -50,9 +50,9 @@ mkBytes' bv = do
 mkWord' :: (Z3.MonadZ3 z3) => [Z3.AST] -> z3 Z3.AST
 mkWord' = foldM1 (flip Z3.mkConcat)
 
-mkBytes :: (Z3.MonadZ3 z3) => Concolic Word32 -> z3 [Concolic Word8]
+mkBytes :: (Z3.MonadZ3 z3, Integral a, FiniteBits a) => Concolic a -> z3 [Concolic Word8]
 mkBytes c = do
-  let concrete = M.mkBytes $ getConcrete c
+  let concrete = M.mkBytes $ fromIntegral (getConcrete c)
   symbolic <- case getSymbolic c of
     Nothing -> pure $ replicate byteSize Nothing
     Just x -> map Just <$> mkBytes' x
@@ -97,7 +97,7 @@ storeBytes :: (Z3.MonadZ3 z3) => Memory -> Address -> [Concolic Word8] -> z3 ()
 storeBytes m a = mapM_ (\(off, byte) -> storeByte m (a + off) byte) . zip [0 ..]
 
 storeHalf :: (Z3.MonadZ3 z3) => Memory -> Address -> Concolic Word16 -> z3 ()
-storeHalf m a w = mkBytes (fmap fromIntegral w) >>= storeBytes m a
+storeHalf m a w = mkBytes w >>= storeBytes m a
 
 storeWord :: (Z3.MonadZ3 z3) => Memory -> Address -> Concolic Word32 -> z3 ()
 storeWord m a w = mkBytes w >>= storeBytes m a
