@@ -5,6 +5,9 @@ import Data.Maybe (catMaybes, fromJust)
 import SymEx.Concolic
 import qualified Z3.Monad as Z3
 
+mkSymbolic :: a -> Z3.AST -> Concolic a
+mkSymbolic c s = MkConcolic c (Just s)
+
 concPair :: (Z3.MonadZ3 z3, FiniteBits a, Integral a) => Concolic a -> z3 (a, Integer)
 concPair conc = do
   s <- getInt (fromJust $ getSymbolic conc)

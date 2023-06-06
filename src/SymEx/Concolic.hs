@@ -1,4 +1,16 @@
-module SymEx.Concolic (Concolic (..), mkConcolic, mkConcrete, mkSymbolic, hasSymbolic, getConcrete, getSymbolic, getSymbolicDef, mkUncons, concretize, evalE) where
+module SymEx.Concolic
+  ( Concolic (..),
+    mkConcolic,
+    mkConcrete,
+    hasSymbolic,
+    getConcrete,
+    getSymbolic,
+    getSymbolicDef,
+    mkUncons,
+    concretize,
+    evalE,
+  )
+where
 
 import Control.Exception (assert)
 import Data.Bits (FiniteBits, finiteBitSize)
@@ -29,18 +41,15 @@ mkConcolic :: a -> Maybe Z3.AST -> Concolic a
 mkConcolic = MkConcolic
 
 -- Create a concrete concolic value, i.e. a value without a symbolic part.
-mkConcrete :: (FiniteBits a) => a -> Concolic a
+mkConcrete :: a -> Concolic a
 mkConcrete v = MkConcolic v Nothing
-
--- Create a concolic value with a symbolic part.
-mkSymbolic :: (FiniteBits a) => a -> Z3.AST -> Concolic a
-mkSymbolic c s = MkConcolic c (Just s)
 
 -- Create a concolic value with an unconstrained symbolic part.
 mkUncons :: (Z3.MonadZ3 z3, FiniteBits a) => a -> String -> z3 (Concolic a)
 mkUncons initial name = do
   symbol <- Z3.mkStringSymbol name
-  mkSymbolic initial <$> Z3.mkBvVar symbol (finiteBitSize initial)
+  symbolic <- Z3.mkBvVar symbol (finiteBitSize initial)
+  pure $ mkConcolic initial (Just symbolic)
 
 -- True if the concolic value has a symbolic part.
 hasSymbolic :: Concolic a -> Bool
@@ -48,7 +57,7 @@ hasSymbolic (MkConcolic _ Nothing) = False
 hasSymbolic (MkConcolic _ (Just _)) = True
 
 -- Extract the concrete part of a concolic value.
-getConcrete :: (FiniteBits a) => Concolic a -> a
+getConcrete :: Concolic a -> a
 getConcrete (MkConcolic w _) = w
 
 -- Extract the optional symbolic part of a concolic value.
