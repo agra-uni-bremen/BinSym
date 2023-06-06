@@ -14,7 +14,7 @@ import Control.Monad.Freer
 import Control.Monad.IO.Class (liftIO)
 import Data.Array.IO (IOArray)
 import Data.Word (Word32)
-import LibRISCV (Address, RegIdx)
+import LibRISCV (Address, RegIdx (..))
 import qualified LibRISCV.Decoder.Instruction as I
 import qualified LibRISCV.Machine.Register as REG
 import qualified LibRISCV.Spec.Expr as E
@@ -22,6 +22,7 @@ import LibRISCV.Spec.Operations (Operations (..))
 import Numeric (showHex)
 import SymEx.Concolic
 import qualified SymEx.Memory as MEM
+import System.Exit
 import qualified Z3.Monad as Z3
 
 type ArchState = (REG.RegisterFile IOArray (Concolic Word32), MEM.Memory)
@@ -104,6 +105,16 @@ symBehavior env@(eval, (regFile, mem)) = \case
     liftIO $ REG.writePC regFile (getConcrete conc)
   ReadPC -> mkConcrete <$> liftIO (REG.readPC regFile)
   Exception _ msg -> error "runtime exception" msg
-  Ecall _ -> liftIO $ putStrLn "ECALL"
+  Ecall _ -> do
+    sys <- (liftIO $ REG.readRegister regFile A7) >>= pure . getConcrete
+    arg <- (liftIO $ REG.readRegister regFile A0) >>= pure . getConcrete
+
+    when (sys /= 93) $
+      liftIO (fail "unknown syscall")
+
+    liftIO $
+      if arg == 0
+        then exitWith ExitSuccess
+        else exitWith (ExitFailure $ fromIntegral arg)
   Ebreak _ -> liftIO $ putStrLn "EBREAK"
   Append__ s s' -> symBehavior env s >> symBehavior env s'
