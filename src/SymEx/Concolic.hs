@@ -43,12 +43,9 @@ hasSymbolic :: Concolic a -> Bool
 hasSymbolic (MkConcolic _ Nothing) = False
 hasSymbolic (MkConcolic _ (Just _)) = True
 
--- Extract the concrete part of a concolic value. Emits an error if the
--- concolic value has a symbolic part, use 'concretize' if you cannot
--- guarantee that this is never the case.
+-- Extract the concrete part of a concolic value.
 getConcrete :: (FiniteBits a) => Concolic a -> a
-getConcrete (MkConcolic w Nothing) = w
-getConcrete (MkConcolic _ (Just _)) = error "getConcrete" "concolic value has symbolic part"
+getConcrete (MkConcolic w _) = w
 
 -- Extract the optional symbolic part of a concolic value.
 getSymbolic :: Concolic a -> Maybe Z3.AST
