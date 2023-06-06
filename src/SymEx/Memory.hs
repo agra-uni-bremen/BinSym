@@ -1,5 +1,16 @@
 -- TODO: Make this interoperable with LibRISCV.Machine.Memory
-module SymEx.Memory where
+module SymEx.Memory
+  ( mkMemory,
+    Memory,
+    loadByte,
+    loadHalf,
+    loadWord,
+    storeByte,
+    storeHalf,
+    storeWord,
+    storeByteString,
+  )
+where
 
 import Control.Exception (assert)
 import Control.Monad.IO.Class (MonadIO, liftIO)
