@@ -48,10 +48,10 @@ symBehavior env@(eval, (regFile, mem)) = \case
   DecodeRS2 instr -> pure . mkConcrete . I.mkRs2 $ getConcrete instr
   DecodeRD instr -> pure . mkConcrete . I.mkRd $ getConcrete instr
   DecodeImmB instr -> pure . mkConcrete . I.immB $ getConcrete instr
-  DecodeImmS instr -> pure . mkConcrete . I.immB $ getConcrete instr
-  DecodeImmU instr -> pure . mkConcrete . I.immB $ getConcrete instr
-  DecodeImmI instr -> pure . mkConcrete . I.immB $ getConcrete instr
-  DecodeImmJ instr -> pure . mkConcrete . I.immB $ getConcrete instr
+  DecodeImmS instr -> pure . mkConcrete . I.immS $ getConcrete instr
+  DecodeImmU instr -> pure . mkConcrete . I.immU $ getConcrete instr
+  DecodeImmI instr -> pure . mkConcrete . I.immI $ getConcrete instr
+  DecodeImmJ instr -> pure . mkConcrete . I.immJ $ getConcrete instr
   DecodeShamt instr -> pure . mkConcrete . I.mkShamt $ getConcrete instr
   RunIf cond next -> do
     conc <- evalE cond
