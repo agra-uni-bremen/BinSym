@@ -5,7 +5,7 @@ import Data.Word (Word32)
 import SymEx.Util (bvSize, mkSymWord32)
 import qualified Z3.Monad as Z3
 
-data Condition = MkCond Z3.AST
+newtype Condition = MkCond Z3.AST
 
 trueConst :: Word32
 trueConst = 1

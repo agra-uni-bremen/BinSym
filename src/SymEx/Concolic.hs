@@ -2,13 +2,13 @@ module SymEx.Concolic (Concolic (..), mkConcolic, mkConcrete, mkSymbolic, hasSym
 
 import Control.Exception (assert)
 import Data.Bits (FiniteBits, finiteBitSize)
-import Data.Maybe (fromMaybe, isJust)
+import Data.Maybe (fromMaybe)
 import Data.Word (Word32)
 import qualified LibRISCV.Machine.Interpreter as I
 import qualified LibRISCV.Spec.Expr as E
 import SymEx.Cond (fromResult)
 import qualified SymEx.Symbolic as S
-import SymEx.Util (bvSize, mkSymWord32)
+import SymEx.Util (bvSize)
 import qualified Z3.Monad as Z3
 
 -- Concolic is a tuple of a concrete value (as represented by

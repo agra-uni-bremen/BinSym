@@ -4,9 +4,8 @@ module SymEx.Memory where
 import Control.Exception (assert)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Array.IO (IOArray, MArray (newArray), readArray, writeArray)
-import Data.Bits (FiniteBits, finiteBitSize)
+import Data.Bits (finiteBitSize)
 import qualified Data.ByteString.Lazy as BSL
-import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Word (Word16, Word32, Word8)
 import LibRISCV (Address)
 import qualified LibRISCV.Machine.Memory as M
@@ -38,18 +37,17 @@ mkBytes' bv = do
     mapM (\n -> Z3.mkExtract ((n * 8) - 1) ((n - 1) * 8) bv) [1 .. bitSize `div` 8]
 
 mkWord' :: (Z3.MonadZ3 z3) => [Z3.AST] -> z3 Z3.AST
-mkWord' = foldM1 (\acc byte -> Z3.mkConcat byte acc)
+mkWord' = foldM1 (flip Z3.mkConcat)
 
 mkBytes :: (Z3.MonadZ3 z3) => Concolic Word32 -> z3 [Concolic Word8]
 mkBytes c = do
   let concrete = M.mkBytes $ getConcrete c
   symbolic <- case getSymbolic c of
-    Nothing -> pure (take byteSize $ repeat Nothing)
+    Nothing -> pure $ replicate byteSize Nothing
     Just x -> map Just <$> mkBytes' x
 
   assert (length concrete == length symbolic) $
-    pure $
-      map (uncurry mkConcolic) (zip concrete symbolic)
+    pure (zipWith mkConcolic concrete symbolic)
   where
     byteSize =
       let bitSize = finiteBitSize (getConcrete c)
@@ -61,7 +59,7 @@ mkWord bytes = do
   symbolic <-
     if any hasSymbolic bytes
       then Just <$> (mapM getSymbolicDef bytes >>= mkWord')
-      else pure $ Nothing
+      else pure Nothing
 
   pure $ mkConcolic concrete symbolic
 
@@ -71,7 +69,9 @@ loadByte :: (Z3.MonadZ3 z3) => Memory -> Address -> z3 (Concolic Word8)
 loadByte mem = liftIO . readArray (memArray mem) . toMemAddr mem
 
 loadBytes :: (Z3.MonadZ3 z3) => Memory -> Address -> Int -> z3 [Concolic Word8]
-loadBytes mem addr numBytes = mapM (loadByte mem) [0 .. (fromIntegral numBytes) - 1]
+loadBytes mem addr numBytes =
+  let endAddr = fromIntegral numBytes + addr - 1
+   in mapM (loadByte mem) [addr .. endAddr]
 
 loadHalf :: (Z3.MonadZ3 z3) => Memory -> Address -> z3 (Concolic Word16)
 loadHalf mem addr = loadBytes mem addr 2 >>= mkWord >>= pure . fmap fromIntegral

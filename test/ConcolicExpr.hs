@@ -14,7 +14,7 @@ concolicTests =
   testGroup
     "Concolic expression language tests"
     [ testCase "Add expression" $ do
-        (c, (Just s)) <- Z3.evalZ3 $ do
+        (c, Just s) <- Z3.evalZ3 $ do
           x <- mkSymbolic 4 <$> mkSymWord32 4
           y <- mkSymbolic 38 <$> mkSymWord32 38
           r <- evalE $ E.Add (E.FromImm x) (E.FromImm y)

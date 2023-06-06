@@ -39,20 +39,20 @@ dumpState (r, _) = REG.dumpRegs (showHex . getConcrete) r >>= putStr
 
 type SymEnv m = (E.Expr (Concolic Word32) -> m (Concolic Word32), ArchState)
 
-getRegIdx :: (Concolic Word32) -> RegIdx
+getRegIdx :: Concolic Word32 -> RegIdx
 getRegIdx = toEnum . fromIntegral . getConcrete
 
 symBehavior :: (Z3.MonadZ3 z3) => SymEnv z3 -> Operations (Concolic Word32) ~> z3
 symBehavior env@(eval, (regFile, mem)) = \case
-  DecodeRS1 instr -> pure . mkConcrete . I.mkRs1 $ getConcrete (instr)
-  DecodeRS2 instr -> pure . mkConcrete . I.mkRs2 $ getConcrete (instr)
-  DecodeRD instr -> pure . mkConcrete . I.mkRd $ getConcrete (instr)
-  DecodeImmB instr -> pure . mkConcrete . I.immB $ getConcrete (instr)
-  DecodeImmS instr -> pure . mkConcrete . I.immB $ getConcrete (instr)
-  DecodeImmU instr -> pure . mkConcrete . I.immB $ getConcrete (instr)
-  DecodeImmI instr -> pure . mkConcrete . I.immB $ getConcrete (instr)
-  DecodeImmJ instr -> pure . mkConcrete . I.immB $ getConcrete (instr)
-  DecodeShamt instr -> pure . mkConcrete . I.mkShamt $ getConcrete (instr)
+  DecodeRS1 instr -> pure . mkConcrete . I.mkRs1 $ getConcrete instr
+  DecodeRS2 instr -> pure . mkConcrete . I.mkRs2 $ getConcrete instr
+  DecodeRD instr -> pure . mkConcrete . I.mkRd $ getConcrete instr
+  DecodeImmB instr -> pure . mkConcrete . I.immB $ getConcrete instr
+  DecodeImmS instr -> pure . mkConcrete . I.immB $ getConcrete instr
+  DecodeImmU instr -> pure . mkConcrete . I.immB $ getConcrete instr
+  DecodeImmI instr -> pure . mkConcrete . I.immB $ getConcrete instr
+  DecodeImmJ instr -> pure . mkConcrete . I.immB $ getConcrete instr
+  DecodeShamt instr -> pure . mkConcrete . I.mkShamt $ getConcrete instr
   RunIf cond next -> do
     conc <- evalE cond
     -- TODO: Use concretize or something here
@@ -102,7 +102,7 @@ symBehavior env@(eval, (regFile, mem)) = \case
   WritePC newPC -> do
     conc <- eval newPC
     liftIO $ REG.writePC regFile (getConcrete conc)
-  ReadPC -> mkConcrete <$> (liftIO $ REG.readPC regFile)
+  ReadPC -> mkConcrete <$> liftIO (REG.readPC regFile)
   Exception _ msg -> error "runtime exception" msg
   Ecall _ -> liftIO $ putStrLn "ECALL"
   Ebreak _ -> liftIO $ putStrLn "EBREAK"
