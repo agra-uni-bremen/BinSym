@@ -9,10 +9,11 @@
 
 module SymEx.Interpreter where
 
-import Control.Monad (unless, when)
+import Control.Monad (when)
 import Control.Monad.Freer
 import Control.Monad.IO.Class (liftIO)
 import Data.Array.IO (IOArray)
+import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Word (Word32)
 import LibRISCV (Address, RegIdx (..))
 import qualified LibRISCV.Decoder.Instruction as I
@@ -22,19 +23,24 @@ import LibRISCV.Spec.Operations (Operations (..))
 import Numeric (showHex)
 import SymEx.Concolic
 import qualified SymEx.Memory as MEM
+import SymEx.Tracer
 import System.Exit
 import qualified Z3.Monad as Z3
 
-type ArchState = (REG.RegisterFile IOArray (Concolic Word32), MEM.Memory)
+type ArchState = (REG.RegisterFile IOArray (Concolic Word32), MEM.Memory, IORef ExecTrace)
 
 mkArchState :: Address -> Word32 -> IO ArchState
 mkArchState memStart memSize = do
   reg <- REG.mkRegFile $ mkConcrete 0
   mem <- MEM.mkMemory memStart memSize
-  pure (reg, mem)
+  ref <- newIORef newExecTrace
+  pure (reg, mem, ref)
+
+getTrace :: ArchState -> IORef ExecTrace
+getTrace (_, _, t) = t
 
 dumpState :: ArchState -> IO ()
-dumpState (r, _) = REG.dumpRegs (showHex . getConcrete) r >>= putStr
+dumpState (r, _, _) = REG.dumpRegs (showHex . getConcrete) r >>= putStr
 
 ------------------------------------------------------------------------
 
@@ -43,8 +49,14 @@ type SymEnv m = (E.Expr (Concolic Word32) -> m (Concolic Word32), ArchState)
 getRegIdx :: Concolic Word32 -> RegIdx
 getRegIdx = toEnum . fromIntegral . getConcrete
 
+trackBranch :: (Z3.MonadZ3 z3) => IORef ExecTrace -> Bool -> Z3.AST -> z3 ()
+trackBranch ref wasTrue cond = do
+  trace <- liftIO $ readIORef ref
+  let newTrace = appendBranch trace wasTrue (newBranch cond)
+  liftIO $ writeIORef ref newTrace
+
 symBehavior :: (Z3.MonadZ3 z3) => SymEnv z3 -> Operations (Concolic Word32) ~> z3
-symBehavior env@(eval, (regFile, mem)) = \case
+symBehavior env@(eval, (regFile, mem, ref)) = \case
   DecodeRS1 instr -> pure . mkConcrete . I.mkRs1 $ getConcrete instr
   DecodeRS2 instr -> pure . mkConcrete . I.mkRs2 $ getConcrete instr
   DecodeRD instr -> pure . mkConcrete . I.mkRd $ getConcrete instr
@@ -56,16 +68,24 @@ symBehavior env@(eval, (regFile, mem)) = \case
   DecodeShamt instr -> pure . mkConcrete . I.mkShamt $ getConcrete instr
   RunIf cond next -> do
     conc <- evalE cond
-    -- TODO: Use concretize or something here
-    when (getConcrete conc == 1) $ do
+
+    let mayBeTrue = getConcrete conc == 1
+    when mayBeTrue $ do
       symBehavior env next
-  -- TODO: Track branch condition if symbolic
+
+    case getSymbolic conc of
+      Just br -> trackBranch ref mayBeTrue br
+      Nothing -> pure ()
   RunUnless cond next -> do
     conc <- evalE cond
-    -- TODO: Use concretize or something here
-    unless (getConcrete conc == 1) $ do
+
+    let mayBeFalse = getConcrete conc == 0
+    when mayBeFalse $ do
       symBehavior env next
-  -- TODO: Track branch condition if symbolic
+
+    case getSymbolic conc of
+      Just br -> trackBranch ref mayBeFalse br
+      Nothing -> pure ()
   ReadRegister idx -> do
     conc <- evalE $ E.FromImm idx
     liftIO $ REG.readRegister regFile (getRegIdx conc)

@@ -26,6 +26,7 @@ library
                     , SymEx.Cond
                     , SymEx.Symbolic
                     , SymEx.Concolic
+                    , SymEx.Tracer
 
     build-depends:    base ^>=4.17.1.0
                     , z3
@@ -58,6 +59,7 @@ test-suite test
                     , Memory
                     , SymbolicExpr
                     , ConcolicExpr
+                    , Tracer
 
     build-depends:
         base          >= 4.15.0.0

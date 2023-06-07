@@ -1,4 +1,5 @@
-module SymEx.Cond (Condition, makeCond, checkCond, assertCond, fromResult) where
+-- TODO: Fix namespace (don't use Cond in names)
+module SymEx.Cond (Condition, makeCond, checkCond, negateCond, assertCond, fromResult) where
 
 import Control.Exception (assert)
 import Data.Word (Word32)
@@ -6,6 +7,7 @@ import SymEx.Util (bvSize, mkSymWord32)
 import qualified Z3.Monad as Z3
 
 newtype Condition = MkCond Z3.AST
+  deriving (Show, Eq)
 
 trueConst :: Word32
 trueConst = 1
@@ -39,6 +41,10 @@ checkCond (MkCond cond) = do
   assert (sort == Z3.Z3_BOOL_SORT) (checkCond' cond)
   where
     checkCond' cond' = fromResult <$> Z3.solverCheckAssumptions [cond']
+
+-- Negate a condition.
+negateCond :: (Z3.MonadZ3 z3) => Condition -> z3 Condition
+negateCond (MkCond cond) = MkCond <$> Z3.mkNot cond
 
 -- Like Z3.assert but for the 'Condition' type.
 assertCond :: (Z3.MonadZ3 z3) => Condition -> z3 ()

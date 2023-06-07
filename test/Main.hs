@@ -4,6 +4,7 @@ import ConcolicExpr
 import Memory
 import SymbolicExpr
 import Test.Tasty
+import Tracer
 
 main :: IO ()
 main = defaultMain tests
@@ -14,5 +15,6 @@ tests =
     "Tests"
     [ symbolicTests,
       concolicTests,
-      memoryTests
+      memoryTests,
+      tracerTests
     ]
