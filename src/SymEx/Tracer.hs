@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 module SymEx.Tracer where
 
 import Control.Applicative ((<|>))
@@ -36,7 +38,7 @@ appendBranch trace wasTrue branch = trace ++ [(wasTrue, branch)]
 solveTrace :: (Z3.MonadZ3 z3) => ExecTrace -> z3 (Maybe Z3.Model)
 solveTrace trace = do
   assertTrace (init trace)
-  let (bool, (MkBranch _ ast)) = last trace
+  let (bool, MkBranch _ ast) = last trace
 
   isSAT <- makeCond bool ast >>= checkCond
   ret <-
@@ -53,7 +55,7 @@ solveTrace trace = do
     -- an 'ExecTrace'. As the last element is not a path condition.
     assertTrace [] = pure ()
     assertTrace t = do
-      conds <- mapM (\(b, (MkBranch _ c)) -> makeCond b c) t
+      conds <- mapM (\(b, MkBranch _ c) -> makeCond b c) t
       mapM_ assertCond conds
 
 ------------------------------------------------------------------------
@@ -91,9 +93,9 @@ canCont _ = False
 -- Create a new execution tree from a trace.
 mkTree :: ExecTrace -> ExecTree
 mkTree [] = Leaf
-mkTree ((wasTrue, br) : [])
-  | wasTrue = Node br (Just $ Leaf) Nothing
-  | otherwise = Node br Nothing (Just $ Leaf)
+mkTree [(wasTrue, br)]
+  | wasTrue = Node br (Just Leaf) Nothing
+  | otherwise = Node br Nothing (Just Leaf)
 mkTree ((True, br) : xs) = Node br (Just $ mkTree xs) Nothing
 mkTree ((False, br) : xs) = Node br Nothing (Just $ mkTree xs)
 
@@ -120,6 +122,8 @@ addTrace (Node _ tb fb) ((wasTrue, br) : xs)
 -- edge leading to it as a context. This case should hence be unrechable.
 addTrace Leaf _ = error "addTrace" "unreachable"
 
+------------------------------------------------------------------------
+
 -- Negate an unnegated branch in the execution tree and return an
 -- 'ExecTrace' which leads to an unexplored execution path. If no
 -- such path exists, then 'Nothing' is returned. If such a path
@@ -135,12 +139,27 @@ negateBranch :: ExecTree -> Maybe ExecTrace
 negateBranch Leaf = Nothing
 negateBranch (Node (MkBranch wasNeg ast) Nothing _)
   | wasNeg = Nothing
-  | otherwise = Just [(True, (MkBranch True ast))]
+  | otherwise = Just [(True, MkBranch True ast)]
 negateBranch (Node (MkBranch wasNeg ast) _ Nothing)
   | wasNeg = Nothing
-  | otherwise = Just [(False, (MkBranch True ast))]
+  | otherwise = Just [(False, MkBranch True ast)]
 negateBranch (Node br (Just ifTrue) (Just ifFalse)) =
   do
     -- TODO: Randomly prefer either the left or right child
-    ((++) [(True, br)] <$> negateBranch ifTrue)
-    <|> ((++) [(False, br)] <$> negateBranch ifFalse)
+    (++) [(True, br)] <$> negateBranch ifTrue
+    <|> (++) [(False, br)] <$> negateBranch ifFalse
+
+-- Find an assignment (i.e. a 'Z3.Model') that causes exploration
+-- of a new execution path through the tested software. This
+-- function updates the metadata in the execution tree and thus
+-- returns a new execution tree, even if no satisfiable assignment
+-- was found.
+findUnexplored :: (Z3.MonadZ3 z3) => ExecTree -> z3 (Maybe Z3.Model, ExecTree)
+findUnexplored tree =
+  case negateBranch tree of
+    Nothing -> pure (Nothing, tree)
+    Just nt -> do
+      let nextTree = addTrace tree nt
+      solveTrace nt >>= \case
+        Nothing -> findUnexplored nextTree
+        Just m -> pure (Just m, nextTree)

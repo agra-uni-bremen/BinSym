@@ -24,18 +24,6 @@ import qualified SymEx.Store as S
 import SymEx.Tracer
 import qualified Z3.Monad as Z3
 
--- Negate branch nodes until a SAT negation is found.
-tilNegated :: (Z3.MonadZ3 z3) => ExecTree -> z3 ((Maybe Z3.Model), ExecTree)
-tilNegated tree = do
-  case negateBranch tree of
-    Nothing -> pure (Nothing, tree)
-    Just nt -> do
-      let nextTree = addTrace tree nt
-      solved <- solveTrace nt
-      case solved of
-        Nothing -> tilNegated nextTree
-        Just m -> pure $ (Just m, nextTree)
-
 runPath :: forall z3. (Z3.MonadZ3 z3) => BasicArgs -> S.Store -> z3 ExecTrace
 runPath (BasicArgs memAddr memSize verbose putReg fp) store = do
   state@(regs, mem, _) <- liftIO $ mkArchState memAddr memSize
@@ -62,9 +50,9 @@ runPath (BasicArgs memAddr memSize verbose putReg fp) store = do
       dumpState state
   pure ret
 
-runAll :: forall z3. (Z3.MonadZ3 z3) => Int -> BasicArgs -> S.Store -> (Maybe ExecTree) -> z3 ()
+runAll :: forall z3. (Z3.MonadZ3 z3) => Int -> BasicArgs -> S.Store -> Maybe ExecTree -> z3 ()
 runAll numPaths args store tree = do
-  liftIO $ (putStrLn $ "\n##\n# " ++ show numPaths ++ "th concolic execution\n##\n")
+  liftIO $ putStrLn $ "\n##\n# " ++ show numPaths ++ "th concolic execution\n##\n"
   trace <- runPath args store
 
   -- newTree is the tree including the trace of the last path.
@@ -72,18 +60,18 @@ runAll numPaths args store tree = do
         Just t -> addTrace t trace
         Nothing -> mkTree trace
 
-  -- nextTree is the execution tree with updated metadata
-  -- for branch nodes which tilNegated attempted to negate.
-  (model, nextTree) <- tilNegated newTree
+  -- nextTree is the execution tree with updated metadata for
+  -- branch nodes which findUnexplored attempted to negate.
+  (model, nextTree) <- findUnexplored newTree
   case model of
     Nothing -> pure ()
     Just m -> do
       newStore <- S.fromModel m
-      liftIO $ putStrLn ("\nNext store:" ++ show newStore)
+      liftIO $ putStrLn ("\nNext assignment:\n" ++ show newStore)
       runAll (numPaths + 1) args newStore (Just nextTree)
 
 main' :: forall z3. (Z3.MonadZ3 z3) => BasicArgs -> z3 ()
-main' args = runAll 1 args S.empty Nothing >> pure ()
+main' args = runAll 1 args S.empty Nothing
 
 main :: IO ()
 main = (Z3.evalZ3 . main') =<< execParser opts
