@@ -1,6 +1,18 @@
 {-# LANGUAGE LambdaCase #-}
 
-module SymEx.Tracer where
+module SymEx.Tracer
+  ( Branch,
+    newBranch,
+    ExecTrace,
+    newExecTrace,
+    appendBranch,
+    BTree (..),
+    ExecTree,
+    mkTree,
+    addTrace,
+    findUnexplored,
+  )
+where
 
 import Control.Applicative ((<|>))
 import SymEx.Cond
