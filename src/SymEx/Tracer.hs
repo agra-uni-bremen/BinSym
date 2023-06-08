@@ -15,7 +15,7 @@ module SymEx.Tracer
 where
 
 import Control.Applicative ((<|>))
-import SymEx.Cond
+import qualified SymEx.Cond as Cond
 import qualified Z3.Monad as Z3
 
 -- Represents a branch condition in the executed code
@@ -52,7 +52,7 @@ solveTrace trace = do
   assertTrace (init trace)
   let (bool, MkBranch _ ast) = last trace
 
-  isSAT <- makeCond bool ast >>= checkCond
+  isSAT <- Cond.new bool ast >>= Cond.check
   ret <-
     if isSAT
       then Just <$> Z3.solverGetModel
@@ -67,8 +67,8 @@ solveTrace trace = do
     -- an 'ExecTrace'. As the last element is not a path condition.
     assertTrace [] = pure ()
     assertTrace t = do
-      conds <- mapM (\(b, MkBranch _ c) -> makeCond b c) t
-      mapM_ assertCond conds
+      conds <- mapM (\(b, MkBranch _ c) -> Cond.new b c) t
+      mapM_ Cond.assert conds
 
 ------------------------------------------------------------------------
 

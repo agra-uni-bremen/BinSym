@@ -1,7 +1,7 @@
 module SymbolicExpr where
 
 import qualified LibRISCV.Spec.Expr as E
-import SymEx.Cond
+import qualified SymEx.Cond as Cond
 import SymEx.Symbolic (evalE)
 import SymEx.Util
 import Test.Tasty
@@ -46,8 +46,8 @@ symbolicTests =
           y <- mkSymWord32 5
 
           eq <- evalE (E.Eq (E.FromImm x) (E.FromImm y))
-          f <- makeCond True eq >>= checkCond
-          s <- makeCond False eq >>= checkCond
+          f <- Cond.new True eq >>= Cond.check
+          s <- Cond.new False eq >>= Cond.check
           pure (f, s)
 
         assertEqual "must be true" True (fst res)
