@@ -9,7 +9,7 @@ import Control.Monad.Freer.Reader (runReader)
 import Control.Monad.IO.Class (liftIO)
 import Data.IORef (readIORef)
 import Data.Word (Word32)
-import LibRISCV (Address, RegIdx (A0))
+import LibRISCV (RegIdx (A0))
 import LibRISCV.CmdLine (BasicArgs (BasicArgs), basicArgs)
 import LibRISCV.Effects.Logging.InstructionFetch (runLogInstructionFetchM, runNoLogging)
 import LibRISCV.Loader (loadElf, readElf, startAddr)
@@ -20,51 +20,70 @@ import Options.Applicative
 import SymEx.Concolic
 import SymEx.Interpreter
 import SymEx.Memory (storeByteString)
+import qualified SymEx.Store as S
 import SymEx.Tracer
 import qualified Z3.Monad as Z3
 
-runPath :: forall z3. (Z3.MonadZ3 z3) => ArchState -> Bool -> Address -> z3 ExecTrace
-runPath state verbose entry = do
+-- Negate branch nodes until a SAT negation is found.
+tilNegated :: (Z3.MonadZ3 z3) => ExecTree -> z3 ((Maybe Z3.Model), ExecTree)
+tilNegated tree = do
+  case negateBranch tree of
+    Nothing -> pure (Nothing, tree)
+    Just nt -> do
+      let nextTree = addTrace tree nt
+      solved <- solveTrace nt
+      case solved of
+        Nothing -> tilNegated nextTree
+        Just m -> pure $ (Just m, nextTree)
+
+runPath :: forall z3. (Z3.MonadZ3 z3) => BasicArgs -> S.Store -> z3 ExecTrace
+runPath (BasicArgs memAddr memSize verbose putReg fp) store = do
+  state@(regs, mem, _) <- liftIO $ mkArchState memAddr memSize
+
+  -- TODO: Don't reinitialize memory on every execution
+  elf <- liftIO $ readElf fp
+  loadElf elf $ storeByteString mem
+  entry <- liftIO $ startAddr elf
+
+  -- Make register A0 unconstrained symbolic for testing purposes
+  symReg <- S.getConcolic store "A0"
+  liftIO $ writeRegister regs A0 symReg
+
   let interpreter =
         if verbose
           then runReader (evalE @z3, state) . runInstruction symBehavior . runLogInstructionFetchM
           else runReader (evalE @z3, state) . runInstruction symBehavior . runNoLogging
 
   runM $ interpreter (buildAST @(Concolic Word32) $ mkConcrete entry)
-  liftIO $ readIORef (getTrace state)
 
-main' :: forall z3. (Z3.MonadZ3 z3) => BasicArgs -> z3 ()
-main' (BasicArgs memAddr memSize verbose putReg fp) = do
-  state@(regs, mem, _) <- liftIO $ mkArchState memAddr memSize
-
-  elf <- liftIO $ readElf fp
-  loadElf elf $ storeByteString mem
-  entry <- liftIO $ startAddr elf
-
-  -- Make register A0 unconstrained symbolic for testing purposes
-  symReg <- mkUncons 0 "A0"
-  liftIO $ writeRegister regs A0 symReg
-
-  -- TODO: Run this in a loop
-  trace <- runPath state verbose entry
-
-  liftIO (putStrLn $ "Trace: " ++ show trace)
-  let negated = negateBranch (mkTree trace)
-  case negated of
-    Nothing -> liftIO $ putStrLn "no non-negated branch condition"
-    Just ne -> do
-      liftIO $ (putStrLn $ "negated: " ++ show ne)
-      solved <- solveTrace ne
-      case solved of
-        Nothing -> liftIO $ putStrLn "no model"
-        Just m -> do
-          liftIO $ putStrLn "alternative path possible:"
-          modelStr <- Z3.showModel m
-          liftIO $ putStrLn modelStr
-
+  ret <- liftIO $ readIORef (getTrace state)
   when putReg $
     liftIO $
       dumpState state
+  pure ret
+
+runAll :: forall z3. (Z3.MonadZ3 z3) => Int -> BasicArgs -> S.Store -> (Maybe ExecTree) -> z3 ()
+runAll numPaths args store tree = do
+  liftIO $ (putStrLn $ "\n##\n# " ++ show numPaths ++ "th concolic execution\n##\n")
+  trace <- runPath args store
+
+  -- newTree is the tree including the trace of the last path.
+  let newTree = case tree of
+        Just t -> addTrace t trace
+        Nothing -> mkTree trace
+
+  -- nextTree is the execution tree with updated metadata
+  -- for branch nodes which tilNegated attempted to negate.
+  (model, nextTree) <- tilNegated newTree
+  case model of
+    Nothing -> pure ()
+    Just m -> do
+      newStore <- S.fromModel m
+      liftIO $ putStrLn ("\nNext store:" ++ show newStore)
+      runAll (numPaths + 1) args newStore (Just nextTree)
+
+main' :: forall z3. (Z3.MonadZ3 z3) => BasicArgs -> z3 ()
+main' args = runAll 1 args S.empty Nothing >> pure ()
 
 main :: IO ()
 main = (Z3.evalZ3 . main') =<< execParser opts
