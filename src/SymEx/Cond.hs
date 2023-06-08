@@ -1,11 +1,12 @@
-module SymEx.Cond (Condition, makeCond, checkCond, assertCond) where
+module SymEx.Cond (Condition, new, check, assert, fromResult) where
 
-import Control.Exception (assert)
+import qualified Control.Exception as E
 import Data.Word (Word32)
 import SymEx.Util (bvSize, mkSymWord32)
 import qualified Z3.Monad as Z3
 
-data Condition = MkCond Z3.AST
+newtype Condition = MkCond Z3.AST
+  deriving (Show, Eq)
 
 trueConst :: Word32
 trueConst = 1
@@ -27,19 +28,19 @@ fromResult Z3.Unsat = False
 fromResult Z3.Undef = error "Z3 solver" "unknown result"
 
 -- Create a Z3 predicate from a Z3 bit-vector.
-makeCond :: (Z3.MonadZ3 z3) => Bool -> Z3.AST -> z3 Condition
-makeCond b cond = bvSize cond >>= \s -> assert (s == 32) makeCond'
+new :: (Z3.MonadZ3 z3) => Bool -> Z3.AST -> z3 Condition
+new b cond = bvSize cond >>= \s -> E.assert (s == 32) new'
   where
-    makeCond' = MkCond <$> (fromBool b >>= Z3.mkEq cond)
+    new' = MkCond <$> (fromBool b >>= Z3.mkEq cond)
 
 -- Check if the given condition is satisfiable.
-checkCond :: (Z3.MonadZ3 z3) => Condition -> z3 Bool
-checkCond (MkCond cond) = do
+check :: (Z3.MonadZ3 z3) => Condition -> z3 Bool
+check (MkCond cond) = do
   sort <- Z3.getSort cond >>= Z3.getSortKind
-  assert (sort == Z3.Z3_BOOL_SORT) (checkCond' cond)
+  E.assert (sort == Z3.Z3_BOOL_SORT) (check' cond)
   where
-    checkCond' cond' = fromResult <$> Z3.solverCheckAssumptions [cond']
+    check' cond' = fromResult <$> Z3.solverCheckAssumptions [cond']
 
 -- Like Z3.assert but for the 'Condition' type.
-assertCond :: (Z3.MonadZ3 z3) => Condition -> z3 ()
-assertCond (MkCond c) = Z3.assert c
+assert :: (Z3.MonadZ3 z3) => Condition -> z3 ()
+assert (MkCond c) = Z3.assert c

@@ -1,9 +1,10 @@
 module Main where
 
-import Expr
+import ConcolicExpr
 import Memory
-import Register
+import SymbolicExpr
 import Test.Tasty
+import Tracer
 
 main :: IO ()
 main = defaultMain tests
@@ -12,7 +13,8 @@ tests :: TestTree
 tests =
   testGroup
     "Tests"
-    [ registerTests,
-      expressionTests,
-      memoryTests
+    [ symbolicTests,
+      concolicTests,
+      memoryTests,
+      tracerTests
     ]

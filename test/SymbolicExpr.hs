@@ -1,18 +1,18 @@
-module Expr where
+module SymbolicExpr where
 
 import qualified LibRISCV.Spec.Expr as E
-import SymEx.Cond
-import SymEx.Interpreter
+import qualified SymEx.Cond as Cond
+import SymEx.Symbolic (evalE)
 import SymEx.Util
 import Test.Tasty
 import Test.Tasty.HUnit
 import Util
 import qualified Z3.Monad as Z3
 
-expressionTests :: TestTree
-expressionTests =
+symbolicTests :: TestTree
+symbolicTests =
   testGroup
-    "Expression language tests"
+    "Symbolic expression language tests"
     [ testCase "Equality expression" $ do
         (Just neq) <- Z3.evalZ3 $ do
           x <- mkSymWord32 42
@@ -46,8 +46,8 @@ expressionTests =
           y <- mkSymWord32 5
 
           eq <- evalE (E.Eq (E.FromImm x) (E.FromImm y))
-          f <- makeCond True eq >>= checkCond
-          s <- makeCond False eq >>= checkCond
+          f <- Cond.new True eq >>= Cond.check
+          s <- Cond.new False eq >>= Cond.check
           pure (f, s)
 
         assertEqual "must be true" True (fst res)

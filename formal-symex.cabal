@@ -22,15 +22,21 @@ library
 
     exposed-modules:  SymEx.Interpreter
                     , SymEx.Util
-                    , SymEx.Register
                     , SymEx.Memory
                     , SymEx.Cond
+                    , SymEx.Symbolic
+                    , SymEx.Concolic
+                    , SymEx.Tracer
+                    , SymEx.Store
 
-    build-depends:    base ^>=4.17.1.0
+    build-depends:    base   ^>=4.17.1.0
+                    , random ^>=1.2.1.1
                     , z3
                     , libriscv
                     , freer-simple
                     , bytestring
+                    , array
+                    , containers
 
 executable riscv-symex
     import:               warnings
@@ -54,8 +60,9 @@ test-suite test
 
     other-modules:    Util
                     , Memory
-                    , Register
-                    , Expr
+                    , SymbolicExpr
+                    , ConcolicExpr
+                    , Tracer
 
     build-depends:
         base          >= 4.15.0.0

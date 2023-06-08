@@ -9,127 +9,132 @@
 
 module SymEx.Interpreter where
 
-import Control.Exception (assert)
 import Control.Monad (when)
 import Control.Monad.Freer
 import Control.Monad.IO.Class (liftIO)
+import Data.Array.IO (IOArray)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Word (Word32)
-import LibRISCV (Address)
+import LibRISCV (Address, RegIdx (..))
 import qualified LibRISCV.Decoder.Instruction as I
+import qualified LibRISCV.Machine.Register as REG
 import qualified LibRISCV.Spec.Expr as E
 import LibRISCV.Spec.Operations (Operations (..))
-import SymEx.Cond
+import Numeric (showHex)
+import SymEx.Concolic
 import qualified SymEx.Memory as MEM
-import qualified SymEx.Register as REG
-import SymEx.Util
+import SymEx.Tracer
+import System.Exit
 import qualified Z3.Monad as Z3
 
--- Map a binary operation in the LibRISCV expression language to a Z3 operation.
-binOp :: (Z3.MonadZ3 z3) => E.Expr Z3.AST -> E.Expr Z3.AST -> (Z3.AST -> Z3.AST -> z3 Z3.AST) -> z3 Z3.AST
-binOp e1 e2 op = do
-  bv1 <- evalE e1
-  bv2 <- evalE e2
-  op bv1 bv2
+type ArchState = (REG.RegisterFile IOArray (Concolic Word32), MEM.Memory, IORef ExecTrace)
 
-{- ORMOLU_DISABLE -}
-evalE :: Z3.MonadZ3 z3 => E.Expr Z3.AST -> z3 Z3.AST
-evalE (E.FromImm e)  = pure e
-evalE (E.FromUInt v) = mkSymWord32 v
-evalE (E.ZExtByte v) = do
-  bv <- evalE v
-  bvSize bv >>= \s -> assert (s == 8)  $ Z3.mkZeroExt 24 bv
-evalE (E.ZExtHalf v) = do
-  bv <- evalE v
-  bvSize bv >>= \s -> assert (s == 16) $ Z3.mkZeroExt 16 bv
-evalE (E.SExtByte v) = do
-  bv <- evalE v
-  bvSize bv >>= \s -> assert (s == 8)  $ Z3.mkSignExt 24 bv
-evalE (E.SExtHalf v) = do
-  bv <- evalE v
-  bvSize bv >>= \s -> assert (s == 16) $ Z3.mkSignExt 16 bv
-evalE (E.Add e1 e2)  = binOp e1 e2 Z3.mkBvadd
-evalE (E.Sub e1 e2)  = binOp e1 e2 Z3.mkBvsub
-evalE (E.Eq e1 e2)   = binOp e1 e2 Z3.mkEq     >>= fromBool
-evalE (E.Slt e1 e2)  = binOp e1 e2 Z3.mkBvslt  >>= fromBool
-evalE (E.Sge e1 e2)  = binOp e1 e2 Z3.mkBvsge  >>= fromBool
-evalE (E.Ult e1 e2)  = binOp e1 e2 Z3.mkBvult  >>= fromBool
-evalE (E.Uge e1 e2)  = binOp e1 e2 Z3.mkBvuge  >>= fromBool
-evalE (E.And e1 e2)  = binOp e1 e2 Z3.mkBvand
-evalE (E.Or e1 e2)   = binOp e1 e2 Z3.mkBvor
-evalE (E.Xor e1 e2)  = binOp e1 e2 Z3.mkBvxor
-evalE (E.LShl e1 e2) = binOp e1 e2 Z3.mkBvshl
-evalE (E.LShr e1 e2) = binOp e1 e2 Z3.mkBvlshr
-evalE (E.AShr e1 e2) = binOp e1 e2 Z3.mkBvashr
-{- ORMOLU_ENABLE -}
+mkArchState :: Address -> Word32 -> IO ArchState
+mkArchState memStart memSize = do
+  reg <- REG.mkRegFile $ mkConcrete 0
+  mem <- MEM.mkMemory memStart memSize
+  ref <- newIORef newExecTrace
+  pure (reg, mem, ref)
+
+getTrace :: ArchState -> IORef ExecTrace
+getTrace (_, _, t) = t
+
+dumpState :: ArchState -> IO ()
+dumpState (r, _, _) = REG.dumpRegs (showHex . getConcrete) r >>= putStr
 
 ------------------------------------------------------------------------
 
-type ArchState = (REG.RegisterFile, MEM.Memory, IORef Word32)
+type SymEnv m = (E.Expr (Concolic Word32) -> m (Concolic Word32), ArchState)
 
-mkArchState :: (Z3.MonadZ3 z3) => Address -> z3 ArchState
-mkArchState memStart = do
-  reg <- REG.mkRegFile
-  mem <- MEM.mkMemory memStart
-  instr <- liftIO $ newIORef (0 :: Word32)
-  pure (reg, mem, instr)
+getRegIdx :: Concolic Word32 -> RegIdx
+getRegIdx = toEnum . fromIntegral . getConcrete
 
-dumpState :: (Z3.MonadZ3 z3) => ArchState -> z3 ()
-dumpState (r, _, _) = do
-  REG.dumpRegs r >>= liftIO . putStr
+trackBranch :: (Z3.MonadZ3 z3) => IORef ExecTrace -> Bool -> Z3.AST -> z3 ()
+trackBranch ref wasTrue cond = do
+  trace <- liftIO $ readIORef ref
+  let newTrace = appendBranch trace wasTrue (newBranch cond)
+  liftIO $ writeIORef ref newTrace
 
-------------------------------------------------------------------------
-
-type SymEnv m = (E.Expr Z3.AST -> m Z3.AST, ArchState)
-
-symBehavior :: (Z3.MonadZ3 z3) => SymEnv z3 -> Operations Z3.AST ~> z3
-symBehavior env@(eval, (regFile, mem, instr)) = \case
-  DecodeRS1 _ -> I.mkRs1 <$> (liftIO $ readIORef instr) >>= mkSymWord32
-  DecodeRS2 _ -> I.mkRs2 <$> (liftIO $ readIORef instr) >>= mkSymWord32
-  DecodeRD _ -> I.mkRd <$> (liftIO $ readIORef instr) >>= mkSymWord32
-  DecodeImmB _ -> I.immB <$> (liftIO $ readIORef instr) >>= mkSymWord32
-  DecodeImmS _ -> I.immS <$> (liftIO $ readIORef instr) >>= mkSymWord32
-  DecodeImmU _ -> I.immU <$> (liftIO $ readIORef instr) >>= mkSymWord32
-  DecodeImmI _ -> I.immI <$> (liftIO $ readIORef instr) >>= mkSymWord32
-  DecodeImmJ _ -> I.immJ <$> (liftIO $ readIORef instr) >>= mkSymWord32
-  DecodeShamt _ -> I.mkShamt <$> (liftIO $ readIORef instr) >>= mkSymWord32
+symBehavior :: (Z3.MonadZ3 z3) => SymEnv z3 -> Operations (Concolic Word32) ~> z3
+symBehavior env@(eval, (regFile, mem, ref)) = \case
+  DecodeRS1 instr -> pure . mkConcrete . I.mkRs1 $ getConcrete instr
+  DecodeRS2 instr -> pure . mkConcrete . I.mkRs2 $ getConcrete instr
+  DecodeRD instr -> pure . mkConcrete . I.mkRd $ getConcrete instr
+  DecodeImmB instr -> pure . mkConcrete . I.immB $ getConcrete instr
+  DecodeImmS instr -> pure . mkConcrete . I.immS $ getConcrete instr
+  DecodeImmU instr -> pure . mkConcrete . I.immU $ getConcrete instr
+  DecodeImmI instr -> pure . mkConcrete . I.immI $ getConcrete instr
+  DecodeImmJ instr -> pure . mkConcrete . I.immJ $ getConcrete instr
+  DecodeShamt instr -> pure . mkConcrete . I.mkShamt $ getConcrete instr
   RunIf cond next -> do
-    c <- evalE cond >>= makeCond True
-    mayBeTrue <- checkCond c
+    conc <- evalE cond
+
+    let mayBeTrue = getConcrete conc == 1
     when mayBeTrue $ do
-      assertCond c
       symBehavior env next
+
+    case getSymbolic conc of
+      Just br -> trackBranch ref mayBeTrue br
+      Nothing -> pure ()
   RunUnless cond next -> do
-    c <- evalE cond >>= makeCond False
-    mayBeFalse <- checkCond c
+    conc <- evalE cond
+
+    let mayBeFalse = getConcrete conc == 0
     when mayBeFalse $ do
-      assertCond c
       symBehavior env next
-  ReadRegister idx -> REG.readRegister regFile idx
-  WriteRegister idx val -> eval val >>= REG.writeRegister regFile idx
-  LoadByte addr -> evalE addr >>= MEM.loadByte mem
-  LoadHalf addr -> evalE addr >>= MEM.loadHalf mem
-  LoadWord addr -> evalE addr >>= MEM.loadWord mem
-  LoadInstr addr -> do
-    x <- evalE addr >>= MEM.loadWord mem >>= Z3.simplify
-    w <- getWord32 x
-    liftIO $ writeIORef instr w
-    pure (w, x)
-  StoreByte addr value -> do
-    a <- evalE addr
-    v <- evalE value
-    MEM.storeByte mem a v
-  StoreHalf addr value -> do
-    a <- evalE addr
-    v <- evalE value
-    MEM.storeHalf mem a v
-  StoreWord addr value -> do
-    a <- evalE addr
-    v <- evalE value
-    MEM.storeWord mem a v
-  WritePC newPC -> eval newPC >>= REG.writePC regFile
-  ReadPC -> REG.readPC regFile
+
+    case getSymbolic conc of
+      Just br -> trackBranch ref mayBeFalse br
+      Nothing -> pure ()
+  ReadRegister idx -> do
+    conc <- evalE $ E.FromImm idx
+    liftIO $ REG.readRegister regFile (getRegIdx conc)
+  WriteRegister idx val -> do
+    conc <- evalE $ E.FromImm idx
+    value <- evalE val
+    liftIO $ REG.writeRegister regFile (getRegIdx conc) value
+  LoadByte a -> do
+    addr <- evalE a >>= concretize
+    byte <- MEM.loadByte mem addr
+    pure $ fmap fromIntegral byte
+  LoadHalf a -> do
+    addr <- evalE a >>= concretize
+    half <- MEM.loadHalf mem addr
+    pure $ fmap fromIntegral half
+  LoadWord a -> do
+    addr <- evalE a >>= concretize
+    MEM.loadWord mem addr
+  LoadInstr a -> do
+    addr <- evalE a >>= concretize
+    inst <- MEM.loadWord mem addr
+    pure (getConcrete inst, inst)
+  StoreByte a v -> do
+    addr <- evalE a >>= concretize
+    value <- evalE v
+    MEM.storeByte mem addr (fmap fromIntegral value)
+  StoreHalf a v -> do
+    addr <- evalE a >>= concretize
+    value <- evalE v
+    MEM.storeHalf mem addr (fmap fromIntegral value)
+  StoreWord a v -> do
+    addr <- evalE a >>= concretize
+    value <- evalE v
+    MEM.storeWord mem addr value
+  WritePC newPC -> do
+    conc <- eval newPC
+    liftIO $ REG.writePC regFile (getConcrete conc)
+  ReadPC -> mkConcrete <$> liftIO (REG.readPC regFile)
   Exception _ msg -> error "runtime exception" msg
-  Ecall _ -> liftIO $ putStrLn "ECALL"
+  Ecall _ -> do
+    sys <- (liftIO $ REG.readRegister regFile A7) >>= pure . getConcrete
+    arg <- (liftIO $ REG.readRegister regFile A0) >>= pure . getConcrete
+
+    when (sys /= 93) $
+      liftIO (fail "unknown syscall")
+
+    liftIO $
+      if arg == 0
+        then exitWith ExitSuccess
+        else exitWith (ExitFailure $ fromIntegral arg)
   Ebreak _ -> liftIO $ putStrLn "EBREAK"
   Append__ s s' -> symBehavior env s >> symBehavior env s'
