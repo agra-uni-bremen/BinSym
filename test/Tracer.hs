@@ -17,6 +17,15 @@ tracerTests =
           pure (cond, mkTree trace)
 
         assertEqual "" (Node (newBranch c) (Just Leaf) Nothing) t,
+      testCase "Add trace to empty tree" $ do
+        (c, t) <- Z3.evalZ3 $ do
+          let tree = mkTree []
+
+          cond <- mkSymWord32 1
+          let trace = [(True, newBranch cond)]
+          pure (cond, addTrace tree trace)
+
+        assertEqual "" (Node (newBranch c) (Just Leaf) Nothing) t,
       testCase "Explore unexplored false branch in root" $ do
         (c, t) <- Z3.evalZ3 $ do
           cond <- mkSymWord32 1

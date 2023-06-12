@@ -137,9 +137,9 @@ addTrace (Node _ tb fb) ((wasTrue, br) : xs)
   | canCont tb && wasTrue = Node br (Just $ mkTree xs) fb
   | canCont fb && not wasTrue = Node br tb (Just $ mkTree xs)
   | otherwise = error "addTrace" "trace control flow diverges from existing tree"
--- Leafs are handled above as the leaf is only meaningful if we have the
--- edge leading to it as a context. This case should hence be unrechable.
-addTrace Leaf _ = error "addTrace" "unreachable"
+-- If we encounter a leaf, this part hasn't been explored yet.
+-- That is, we can just insert the trace "as is" at this point.
+addTrace Leaf trace = mkTree trace
 
 ------------------------------------------------------------------------
 
