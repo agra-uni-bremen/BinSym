@@ -7,20 +7,16 @@ module SymEx.Concolic
     getSymbolic,
     getSymbolicDef,
     mkUncons,
-    concretize,
     evalE,
   )
 where
 
-import Control.Exception (assert)
 import Data.Bits (FiniteBits, finiteBitSize)
 import Data.Maybe (fromMaybe)
 import Data.Word (Word32)
 import qualified LibRISCV.Machine.Interpreter as I
 import qualified LibRISCV.Spec.Expr as E
-import SymEx.Cond (fromResult)
 import qualified SymEx.Symbolic as S
-import SymEx.Util (bvSize)
 import qualified Z3.Monad as Z3
 
 -- Concolic is a tuple of a concrete value (as represented by
@@ -70,16 +66,6 @@ getSymbolic (MkConcolic _ s) = s
 getSymbolicDef :: (Z3.MonadZ3 z3, Integral a, FiniteBits a) => Concolic a -> z3 Z3.AST
 getSymbolicDef (MkConcolic c s) = do
   flip fromMaybe s <$> Z3.mkBitvector (finiteBitSize c) (fromIntegral c)
-
--- Concretize the concolic value.
-concretize :: (Z3.MonadZ3 z3, Integral a, FiniteBits a) => Concolic a -> z3 a
-concretize (MkConcolic w Nothing) = pure w
-concretize (MkConcolic w (Just s)) = do
-  let concSz = finiteBitSize w
-  bvSize s >>= \sz -> assert (sz == concSz) $ do
-    eq <- Z3.mkBitvector concSz (fromIntegral w) >>= \w' -> Z3.mkEq s w'
-    Z3.assert eq
-    Z3.check >>= \r -> assert (fromResult r) (pure w)
 
 ------------------------------------------------------------------------
 

@@ -1,4 +1,4 @@
-module SymEx.Cond (Condition, new, check, assert, fromResult) where
+module SymEx.Cond (Condition, new, getAST, check, assert, fromResult) where
 
 import qualified Control.Exception as E
 import Data.Word (Word32)
@@ -32,6 +32,10 @@ new :: (Z3.MonadZ3 z3) => Bool -> Z3.AST -> z3 Condition
 new b cond = bvSize cond >>= \s -> E.assert (s == 32) new'
   where
     new' = MkCond <$> (fromBool b >>= Z3.mkEq cond)
+
+-- Extract the Z3 expression from a condition.
+getAST :: Condition -> Z3.AST
+getAST (MkCond ast) = ast
 
 -- Check if the given condition is satisfiable.
 check :: (Z3.MonadZ3 z3) => Condition -> z3 Bool

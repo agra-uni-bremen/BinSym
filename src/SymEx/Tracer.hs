@@ -6,6 +6,7 @@ module SymEx.Tracer
     ExecTrace,
     newExecTrace,
     appendBranch,
+    appendCons,
     BTree (..),
     ExecTree,
     mkTree,
@@ -43,6 +44,12 @@ newExecTrace = []
 -- if the branch was taken or if it was not taken.
 appendBranch :: ExecTrace -> Bool -> Branch -> ExecTrace
 appendBranch trace wasTrue branch = trace ++ [(wasTrue, branch)]
+
+-- Append a constraint to the execution tree. This constraint must
+-- be true and, contrary to appendBranch, negation will not be
+-- attempted for it.
+appendCons :: ExecTrace -> Z3.AST -> ExecTrace
+appendCons trace cons = trace ++ [(True, MkBranch True cons)]
 
 -- For a given execution trace, return an assignment (represented
 -- as a 'Z3.Model') which statisfies all symbolic branch conditions.

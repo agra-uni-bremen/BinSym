@@ -11,7 +11,7 @@ mkSymbolic c s = MkConcolic c (Just s)
 concPair :: (Z3.MonadZ3 z3, FiniteBits a, Integral a) => Concolic a -> z3 (a, Integer)
 concPair conc = do
   s <- getInt (fromJust $ getSymbolic conc)
-  c <- concretize conc
+  let c = getConcrete conc
   pure (c, fromJust s)
 
 getInts :: (Z3.MonadZ3 z3) => [Z3.AST] -> z3 (Maybe [Integer])

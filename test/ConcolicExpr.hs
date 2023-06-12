@@ -20,8 +20,7 @@ concolicTests =
           r <- evalE $ E.Add (E.FromImm x) (E.FromImm y)
 
           s <- getInt (fromJust $ getSymbolic r)
-          c <- concretize r
-          pure (c, s)
+          pure (getConcrete r, s)
 
         assertEqual "Concrete part" 42 c
         assertEqual "Symbolic part" 42 s
