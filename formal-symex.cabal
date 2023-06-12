@@ -48,6 +48,7 @@ executable riscv-symex
                     , formal-symex
                     , libriscv
                     , optparse-applicative
+                    , random
                     , freer-simple
                     , z3
 
