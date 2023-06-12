@@ -10,13 +10,18 @@ int first_divisor(unsigned int a) {
 	return a;
 }
 
-int main(void) {
+void main(void) {
 	register int a asm("a0");
+	register int is_prime asm("a2");
+	register int number asm("a3");
+
 	if (a <= 10) {
 		if (a > 1 && first_divisor(a) == a) {
-			return 1;
+			is_prime = 1;
+			number = a;
 		} else {
-			return 0;
+			is_prime = 0;
+			number = a;
 		}
 	}
 }
