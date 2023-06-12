@@ -9,13 +9,14 @@ import Control.Monad.Freer.Reader (runReader)
 import Control.Monad.IO.Class (liftIO)
 import Data.IORef (readIORef)
 import Data.Word (Word32)
-import LibRISCV (RegIdx (A0))
+import LibRISCV (RegIdx (A0, A1, SP))
 import LibRISCV.CmdLine (BasicArgs (BasicArgs), basicArgs)
 import LibRISCV.Effects.Logging.InstructionFetch (runLogInstructionFetchM, runNoLogging)
 import LibRISCV.Loader (loadElf, readElf, startAddr)
 import LibRISCV.Machine.Interpreter (runInstruction)
 import LibRISCV.Machine.Register (writeRegister)
 import LibRISCV.Spec.AST (buildAST)
+import LibRISCV.Utils (align)
 import Options.Applicative
 import SymEx.Concolic
 import SymEx.Interpreter
@@ -46,6 +47,11 @@ symbolicArgs =
 runPath :: forall z3. (Z3.MonadZ3 z3) => BasicArgs -> S.Store -> z3 ExecTrace
 runPath (BasicArgs memAddr memSize verbose putReg fp) store = do
   state@(regs, mem, _) <- liftIO $ mkArchState memAddr memSize
+
+  -- Let stack pointer start at end of memory by default.
+  -- It must be possible to perform a LW with this address.
+  let initalSP = align (memAddr + memSize - 1)
+  liftIO $ writeRegister regs SP (mkConcrete initalSP)
 
   -- TODO: Don't reinitialize memory on every execution
   elf <- liftIO $ readElf fp
