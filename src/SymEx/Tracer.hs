@@ -30,6 +30,11 @@ data Branch
 newBranch :: Z3.AST -> Branch
 newBranch = MkBranch False
 
+-- Create a new branch from an existing branch, thereby updating its metadata.
+-- It is assumed that the condition, encoded in the branches, is equal.
+fromBranch :: Branch -> Branch -> Branch
+fromBranch (MkBranch wasNeg' _) (MkBranch wasNeg ast) = MkBranch (wasNeg || wasNeg') ast
+
 ------------------------------------------------------------------------
 
 -- Represents a single execution through a program, tracking for each
@@ -130,13 +135,20 @@ mkTree ((False, br) : xs) = Node br Nothing (Just $ mkTree xs)
 -- the trace should also be equal, regarding the encoded condition.
 addTrace :: ExecTree -> ExecTrace -> ExecTree
 addTrace tree [] = tree
-addTrace (Node _ (Just tb) (Just fb)) ((wasTrue, br) : xs)
-  | wasTrue = Node br (Just $ addTrace tb xs) (Just fb)
-  | otherwise = Node br (Just tb) (Just $ addTrace fb xs)
-addTrace (Node _ tb fb) ((wasTrue, br) : xs)
-  | canCont tb && wasTrue = Node br (Just $ mkTree xs) fb
-  | canCont fb && not wasTrue = Node br tb (Just $ mkTree xs)
-  | otherwise = error "addTrace" "trace control flow diverges from existing tree"
+-- The trace takes the True branch and we have taken that previously.
+--  ↳ Recursively decent on that branch and look at remaining trace.
+addTrace (Node br' (Just tb) fb) ((True, br) : xs) =
+  Node (fromBranch br' br) (Just $ addTrace tb xs) fb
+-- The trace takes the False branch and we have taken that previously.
+--  ↳ Recursively decent on that branch and look at remaining trace.
+addTrace (Node br' tb (Just fb)) ((False, br) : xs) =
+  Node (fromBranch br' br) tb (Just $ addTrace fb xs)
+-- If the trace takes the True/False branch and we have not taken that
+-- yet (i.e. canCont is True) we insert the trace at that position.
+addTrace (Node br' tb fb) ((wasTrue, br) : xs)
+  | canCont tb && wasTrue = Node (fromBranch br' br) (Just $ mkTree xs) fb
+  | canCont fb && not wasTrue = Node (fromBranch br' br) tb (Just $ mkTree xs)
+  | otherwise = error "unreachable"
 -- If we encounter a leaf, this part hasn't been explored yet.
 -- That is, we can just insert the trace "as is" at this point.
 addTrace Leaf trace = mkTree trace
