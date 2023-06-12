@@ -101,7 +101,9 @@ symBehavior env@(eval, (regFile, mem, ref)) = \case
       symBehavior env next
 
     case getSymbolic conc of
-      Just br -> trackBranch ref mayBeFalse br
+      -- Track branch check for ==1 if True is supplied here.
+      -- Hence, we need to negate mayBeFalse here as we want ==0.
+      Just br -> trackBranch ref (not mayBeFalse) br
       Nothing -> pure ()
   ReadRegister idx -> do
     conc <- evalE $ E.FromImm idx
