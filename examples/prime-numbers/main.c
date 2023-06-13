@@ -15,13 +15,16 @@ void main(void) {
 	register int is_prime asm("a2");
 	register int number asm("a3");
 
-	if (a <= 10) {
-		if (a > 1 && first_divisor(a) == a) {
+	// a is unconstrained symbolic
+	int stack_copy = a;
+
+	if (stack_copy <= 10) {
+		if (stack_copy > 1 && first_divisor(stack_copy) == stack_copy) {
 			is_prime = 1;
-			number = a;
+			number = stack_copy;
 		} else {
 			is_prime = 0;
-			number = a;
+			number = stack_copy;
 		}
 	}
 }
