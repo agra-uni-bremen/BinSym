@@ -46,7 +46,8 @@ symbolicArgs =
 
 runPath :: forall z3. (Z3.MonadZ3 z3) => BasicArgs -> S.Store -> z3 ExecTrace
 runPath (BasicArgs memAddr memSize verbose putReg fp) store = do
-  state@(regs, mem, _) <- liftIO $ mkArchState memAddr memSize
+  state <- liftIO $ mkArchState memAddr memSize
+  let regs = getRegs state
 
   -- Let stack pointer start at end of memory by default.
   -- It must be possible to perform a LW with this address.
@@ -55,7 +56,7 @@ runPath (BasicArgs memAddr memSize verbose putReg fp) store = do
 
   -- TODO: Don't reinitialize memory on every execution
   elf <- liftIO $ readElf fp
-  loadElf elf $ storeByteString mem
+  loadElf elf $ storeByteString (getMem state)
   entry <- liftIO $ startAddr elf
 
   -- Make register A0 unconstrained symbolic for testing purposes

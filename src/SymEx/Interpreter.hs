@@ -7,7 +7,13 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
-module SymEx.Interpreter where
+module SymEx.Interpreter
+  ( ArchState (getRegs, getMem, getTrace),
+    mkArchState,
+    dumpState,
+    symBehavior,
+  )
+where
 
 import Control.Monad (when)
 import Control.Monad.Freer
@@ -27,20 +33,21 @@ import SymEx.Tracer
 import System.Exit
 import qualified Z3.Monad as Z3
 
-type ArchState = (REG.RegisterFile IOArray (Concolic Word32), MEM.Memory, IORef ExecTrace)
+data ArchState = MkArchState
+  { getRegs :: REG.RegisterFile IOArray (Concolic Word32),
+    getMem :: MEM.Memory,
+    getTrace :: IORef ExecTrace
+  }
 
 mkArchState :: Address -> Word32 -> IO ArchState
 mkArchState memStart memSize = do
   reg <- REG.mkRegFile $ mkConcrete 0
   mem <- MEM.mkMemory memStart memSize
   ref <- newIORef newExecTrace
-  pure (reg, mem, ref)
-
-getTrace :: ArchState -> IORef ExecTrace
-getTrace (_, _, t) = t
+  pure $ MkArchState reg mem ref
 
 dumpState :: ArchState -> IO ()
-dumpState (r, _, _) = REG.dumpRegs (showHex . getConcrete) r >>= putStr
+dumpState MkArchState {getRegs = r} = REG.dumpRegs (showHex . getConcrete) r >>= putStr
 
 ------------------------------------------------------------------------
 
@@ -73,7 +80,7 @@ concretize ref value = do
   pure conc
 
 symBehavior :: (Z3.MonadZ3 z3) => SymEnv z3 -> Operations (Concolic Word32) ~> z3
-symBehavior env@(eval, (regFile, mem, ref)) = \case
+symBehavior env@(eval, (MkArchState regFile mem ref)) = \case
   DecodeRS1 instr -> pure . mkConcrete . I.mkRs1 $ getConcrete instr
   DecodeRS2 instr -> pure . mkConcrete . I.mkRs2 $ getConcrete instr
   DecodeRD instr -> pure . mkConcrete . I.mkRd $ getConcrete instr
