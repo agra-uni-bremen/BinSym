@@ -1,7 +1,8 @@
 -- TODO: Make this interoperable with LibRISCV.Machine.Memory
 module SymEx.Memory
-  ( mkMemory,
-    Memory,
+  ( Memory,
+    mkMemory,
+    copyMemory,
     loadByte,
     loadHalf,
     loadWord,
@@ -34,6 +35,9 @@ mkMemory memStart size = do
   -- TODO: Use an unconstrained value for uninitialized memory
   ary <- liftIO $ newArray (0, size - 1) (mkConcrete 0)
   pure $ MkMemory memStart ary
+
+copyMemory :: (MonadIO m) => Memory -> m Memory
+copyMemory (MkMemory s a) = MkMemory s <$> (liftIO $ copyArray a)
 
 -- Translate global address to a memory-local address.
 toMemAddr :: Memory -> Address -> Address

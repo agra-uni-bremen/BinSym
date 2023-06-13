@@ -10,6 +10,7 @@
 module SymEx.Interpreter
   ( ArchState (getRegs, getMem, getTrace),
     mkArchState,
+    fromMemory,
     dumpState,
     symBehavior,
   )
@@ -41,8 +42,12 @@ data ArchState = MkArchState
 
 mkArchState :: Address -> Word32 -> IO ArchState
 mkArchState memStart memSize = do
-  reg <- REG.mkRegFile $ mkConcrete 0
   mem <- MEM.mkMemory memStart memSize
+  fromMemory mem
+
+fromMemory :: MEM.Memory -> IO ArchState
+fromMemory mem = do
+  reg <- REG.mkRegFile $ mkConcrete 0
   ref <- newIORef newExecTrace
   pure $ MkArchState reg mem ref
 

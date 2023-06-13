@@ -1,7 +1,19 @@
-module SymEx.Util (mkSymWord8, mkSymWord32, getWord32, bvSize, fromBool, foldM1) where
+module SymEx.Util
+  ( mkSymWord8,
+    mkSymWord32,
+    getWord32,
+    bvSize,
+    fromBool,
+    foldM1,
+    copyArray,
+  )
+where
 
 import Control.Exception (assert)
 import Control.Monad (foldM)
+import Data.Array.Base (getNumElements, unsafeRead)
+import Data.Array.IO (MArray, getBounds, newListArray)
+import Data.Ix (Ix)
 import Data.Word (Word32, Word8)
 import qualified Z3.Monad as Z3
 
@@ -38,3 +50,11 @@ fromBool boolAst = do
 foldM1 :: (Monad m) => (a -> a -> m a) -> [a] -> m a
 foldM1 _ [] = error "empty list"
 foldM1 f (x : xs) = foldM f x xs
+
+-- Create a deep copy of a mutable array.
+copyArray :: (Ix i, MArray a e m) => a i e -> m (a i e)
+copyArray marr = do
+  (l, u) <- getBounds marr
+  n <- getNumElements marr
+  es <- mapM (unsafeRead marr) [0 .. n - 1]
+  newListArray (l, u) es
