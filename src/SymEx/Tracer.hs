@@ -16,7 +16,9 @@ module SymEx.Tracer
 where
 
 import Control.Applicative ((<|>))
+import Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified SymEx.Cond as Cond
+import System.Random (randomIO)
 import qualified Z3.Monad as Z3
 
 -- Represents a branch condition in the executed code
@@ -166,19 +168,28 @@ addTrace Leaf trace = mkTree trace
 -- If further branches are to be negated, the resulting trace should
 -- be added to the 'ExecTree' using 'addTrace' to update the metadata
 -- in the tree as well.
-negateBranch :: ExecTree -> Maybe ExecTrace
-negateBranch Leaf = Nothing
+negateBranch :: (MonadIO m) => ExecTree -> m (Maybe ExecTrace)
+negateBranch Leaf = pure Nothing
 negateBranch (Node (MkBranch wasNeg ast) Nothing _)
-  | wasNeg = Nothing
-  | otherwise = Just [(True, MkBranch True ast)]
+  | wasNeg = pure Nothing
+  | otherwise = pure $ Just [(True, MkBranch True ast)]
 negateBranch (Node (MkBranch wasNeg ast) _ Nothing)
-  | wasNeg = Nothing
-  | otherwise = Just [(False, MkBranch True ast)]
-negateBranch (Node br (Just ifTrue) (Just ifFalse)) =
-  do
-    -- TODO: Randomly prefer either the left or right child
-    (++) [(True, br)] <$> negateBranch ifTrue
-    <|> (++) [(False, br)] <$> negateBranch ifFalse
+  | wasNeg = pure Nothing
+  | otherwise = pure $ Just [(False, MkBranch True ast)]
+negateBranch (Node br (Just ifTrue) (Just ifFalse)) = do
+  -- Traversation of the true/false branch (hopefully lazy evaluated).
+  tb <- negateBranch ifTrue
+  fb <- negateBranch ifFalse
+
+  -- Random traverse either the true or the false branch first.
+  -- Selecting the first unnegated node in the upper parts of the tree.
+  randomValue <- liftIO (randomIO :: IO Int)
+  let select =
+        if even randomValue
+          then (<|>)
+          else flip (<|>)
+
+  pure (((++) [(True, br)] <$> tb) `select` ((++) [(False, br)] <$> fb))
 
 -- Find an assignment (i.e. a 'Z3.Model') that causes exploration
 -- of a new execution path through the tested software. This
@@ -186,8 +197,9 @@ negateBranch (Node br (Just ifTrue) (Just ifFalse)) =
 -- returns a new execution tree, even if no satisfiable assignment
 -- was found.
 findUnexplored :: (Z3.MonadZ3 z3) => ExecTree -> z3 (Maybe Z3.Model, ExecTree)
-findUnexplored tree =
-  case negateBranch tree of
+findUnexplored tree = do
+  negated <- negateBranch tree
+  case negated of
     Nothing -> pure (Nothing, tree)
     Just nt -> do
       let nextTree = addTrace tree nt
