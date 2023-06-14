@@ -29,6 +29,7 @@ library
                     , SymEx.Concolic
                     , SymEx.Tracer
                     , SymEx.Store
+                    , SymEx.Syscall
 
     build-depends:    base   ^>=4.17.1.0
                     , random ^>=1.2.1.1

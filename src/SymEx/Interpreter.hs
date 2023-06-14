@@ -22,8 +22,8 @@ import LibRISCV.Spec.Operations (Operations (..))
 import SymEx.ArchState
 import SymEx.Concolic
 import qualified SymEx.Memory as MEM
+import SymEx.Syscall
 import SymEx.Tracer
-import System.Exit
 import qualified Z3.Monad as Z3
 
 ------------------------------------------------------------------------
@@ -57,7 +57,7 @@ concretize ref value = do
   pure conc
 
 symBehavior :: (Z3.MonadZ3 z3) => SymEnv z3 -> Operations (Concolic Word32) ~> z3
-symBehavior env@(eval, (MkArchState regFile mem ref)) = \case
+symBehavior env@(eval, state@(MkArchState regFile mem ref)) = \case
   DecodeRS1 instr -> pure . mkConcrete . I.mkRs1 $ getConcrete instr
   DecodeRS2 instr -> pure . mkConcrete . I.mkRs2 $ getConcrete instr
   DecodeRD instr -> pure . mkConcrete . I.mkRd $ getConcrete instr
@@ -129,15 +129,7 @@ symBehavior env@(eval, (MkArchState regFile mem ref)) = \case
   ReadPC -> mkConcrete <$> liftIO (REG.readPC regFile)
   Exception _ msg -> error "runtime exception" msg
   Ecall _ -> do
-    sys <- (liftIO $ REG.readRegister regFile A7) >>= pure . getConcrete
-    arg <- (liftIO $ REG.readRegister regFile A0) >>= pure . getConcrete
-
-    when (sys /= 93) $
-      liftIO (fail "unknown syscall")
-
-    liftIO $
-      if arg == 0
-        then exitWith ExitSuccess
-        else exitWith (ExitFailure $ fromIntegral arg)
+    sys <- liftIO $ REG.readRegister regFile A7
+    execSyscall state (getConcrete sys)
   Ebreak _ -> liftIO $ putStrLn "EBREAK"
   Append__ s s' -> symBehavior env s >> symBehavior env s'
