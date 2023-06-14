@@ -18,6 +18,7 @@ import LibRISCV.Machine.Register (writeRegister)
 import LibRISCV.Spec.AST (buildAST)
 import LibRISCV.Utils (align)
 import Options.Applicative
+import SymEx.ArchState
 import SymEx.Concolic
 import SymEx.Interpreter
 import qualified SymEx.Memory as MEM

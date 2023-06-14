@@ -7,52 +7,24 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
-module SymEx.Interpreter
-  ( ArchState (getRegs, getMem, getTrace),
-    mkArchState,
-    fromMemory,
-    dumpState,
-    symBehavior,
-  )
-where
+module SymEx.Interpreter (symBehavior) where
 
 import Control.Monad (when)
 import Control.Monad.Freer
 import Control.Monad.IO.Class (liftIO)
-import Data.Array.IO (IOArray)
-import Data.IORef (IORef, newIORef, readIORef, writeIORef)
+import Data.IORef (IORef, readIORef, writeIORef)
 import Data.Word (Word32)
-import LibRISCV (Address, RegIdx (..))
+import LibRISCV (RegIdx (..))
 import qualified LibRISCV.Decoder.Instruction as I
 import qualified LibRISCV.Machine.Register as REG
 import qualified LibRISCV.Spec.Expr as E
 import LibRISCV.Spec.Operations (Operations (..))
-import Numeric (showHex)
+import SymEx.ArchState
 import SymEx.Concolic
 import qualified SymEx.Memory as MEM
 import SymEx.Tracer
 import System.Exit
 import qualified Z3.Monad as Z3
-
-data ArchState = MkArchState
-  { getRegs :: REG.RegisterFile IOArray (Concolic Word32),
-    getMem :: MEM.Memory,
-    getTrace :: IORef ExecTrace
-  }
-
-mkArchState :: Address -> Word32 -> IO ArchState
-mkArchState memStart memSize = do
-  mem <- MEM.mkMemory memStart memSize
-  fromMemory mem
-
-fromMemory :: MEM.Memory -> IO ArchState
-fromMemory mem = do
-  reg <- REG.mkRegFile $ mkConcrete 0
-  ref <- newIORef newExecTrace
-  pure $ MkArchState reg mem ref
-
-dumpState :: ArchState -> IO ()
-dumpState MkArchState {getRegs = r} = REG.dumpRegs (showHex . getConcrete) r >>= putStr
 
 ------------------------------------------------------------------------
 
