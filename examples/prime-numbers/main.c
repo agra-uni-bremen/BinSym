@@ -11,20 +11,20 @@ int first_divisor(unsigned int a) {
 }
 
 void main(void) {
-	register int a asm("a0");
+	register int _a asm("a0");
 	register int is_prime asm("a2");
 	register int number asm("a3");
 
 	// a is unconstrained symbolic
-	int stack_copy = a;
+	int a = _a;
 
-	if (stack_copy <= 10) {
-		if (stack_copy > 1 && first_divisor(stack_copy) == stack_copy) {
+	if (a <= 10) {
+		if (a > 1 && first_divisor(a) == a) {
 			is_prime = 1;
-			number = stack_copy;
+			number = a;
 		} else {
 			is_prime = 0;
-			number = stack_copy;
+			number = a;
 		}
 	}
 }
