@@ -39,6 +39,7 @@ library
                     , bytestring
                     , array
                     , containers
+                    , bv
 
 executable riscv-symex
     import:               warnings
@@ -53,6 +54,7 @@ executable riscv-symex
                     , random
                     , freer-simple
                     , z3
+                    , bv
 
 test-suite test
     import:           warnings

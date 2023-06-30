@@ -3,7 +3,7 @@ module SymEx.Syscall (execSyscall) where
 import Control.Monad.IO.Class (liftIO)
 import Data.Word (Word32)
 import LibRISCV (RegIdx (A0))
-import qualified LibRISCV.Machine.Register as REG
+import qualified LibRISCV.Effects.Operations.Default.Machine.Register as REG
 import SymEx.ArchState
 import SymEx.Concolic
 import System.Exit

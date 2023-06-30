@@ -1,7 +1,7 @@
 module ConcolicExpr where
 
 import Data.Maybe (fromJust)
-import qualified LibRISCV.Spec.Expr as E
+import qualified LibRISCV.Effects.Expressions.Expr as E
 import SymEx.Concolic
 import SymEx.Util (mkSymWord32)
 import Test.Tasty
@@ -23,5 +23,15 @@ concolicTests =
           pure (getConcrete r, s)
 
         assertEqual "Concrete part" 42 c
-        assertEqual "Symbolic part" 42 s
+        assertEqual "Symbolic part" 42 s,
+      testCase "Extract expression" $ do
+        (c, Just s) <- Z3.evalZ3 $ do
+          x <- mkSymbolic 0xdeadbeef <$> mkSymWord32 0xdeadbeef
+          r <- evalE (E.Extract 0 16 $ E.FromImm x)
+
+          s <- Z3.simplify (fromJust $ getSymbolic r) >>= getInt
+          pure (getConcrete r, s)
+
+        assertEqual "Concrete part" 0xbeef c
+        assertEqual "Symbolic part" 0xbeef s
     ]

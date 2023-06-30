@@ -10,7 +10,7 @@ import Data.Array.IO (IOArray)
 import Data.IORef (IORef, newIORef)
 import Data.Word (Word32)
 import LibRISCV (Address)
-import qualified LibRISCV.Machine.Register as REG
+import qualified LibRISCV.Effects.Operations.Default.Machine.Register as REG
 import Numeric (showHex)
 import SymEx.Concolic
 import qualified SymEx.Memory as MEM

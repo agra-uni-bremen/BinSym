@@ -1,6 +1,6 @@
 module SymbolicExpr where
 
-import qualified LibRISCV.Spec.Expr as E
+import qualified LibRISCV.Effects.Expressions.Expr as E
 import qualified SymEx.Cond as Cond
 import SymEx.Symbolic (evalE)
 import SymEx.Util
@@ -28,6 +28,12 @@ symbolicTests =
 
         assertEqual "must not be equal" 0 neq
         assertEqual "must be equal" 1 eq,
+      testCase "Extract expression" $ do
+        v <- Z3.evalZ3 $ do
+          w <- mkSymWord32 0xdeadbeef
+          evalE (E.Extract 0 16 $ E.FromImm w) >>= Z3.simplify >>= getWord32
+
+        assertEqual "must be first half" 0xbeef v,
       testCase "Extract constant" $ do
         v <- Z3.evalZ3 $ do
           w <- mkSymWord32 42
@@ -37,7 +43,7 @@ symbolicTests =
       testCase "Byte sign extension" $ do
         (Just v) <- Z3.evalZ3 $ do
           x <- mkSymWord8 0xef
-          evalE (E.SExtByte (E.FromImm x)) >>= getInt
+          evalE (E.SExt 24 (E.FromImm x)) >>= getInt
 
         assertEqual "sign extended lsb" 0xffffffef v,
       testCase "Check statisfability" $ do

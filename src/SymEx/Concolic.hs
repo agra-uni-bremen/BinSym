@@ -1,3 +1,11 @@
+{-# LANGUAGE FlexibleInstances #-}
+-- Ignore orphan instance of FiniteBits for BV.BV.
+-- This instance has been proposed upstream <https://github.com/IagoAbal/haskell-bv/pull/9>.
+--
+-- Unfortunately, we can't disable this warning only for this instance.
+-- See: https://gitlab.haskell.org/ghc/ghc/-/issues/602
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module SymEx.Concolic
   ( Concolic (..),
     mkConcolic,
@@ -11,11 +19,12 @@ module SymEx.Concolic
   )
 where
 
+import qualified Data.BitVector as BV
 import Data.Bits (FiniteBits, finiteBitSize)
 import Data.Maybe (fromMaybe)
-import Data.Word (Word32)
-import qualified LibRISCV.Machine.Interpreter as I
-import qualified LibRISCV.Spec.Expr as E
+import LibRISCV.Effects.Decoding.Default.Interpreter (Decodable (..))
+import qualified LibRISCV.Effects.Expressions.Default.EvalE as I
+import qualified LibRISCV.Effects.Expressions.Expr as E
 import qualified SymEx.Symbolic as S
 import qualified Z3.Monad as Z3
 
@@ -29,8 +38,15 @@ data Concolic a
       a -- Concrete value
       (Maybe Z3.AST) -- Symbolic value (bit-vector)
 
+instance Decodable (Concolic BV.BV) where
+  fromWord = mkConcrete . BV.bitVec 32
+  toWord = fromIntegral . getConcrete
+
 instance Functor Concolic where
   fmap fn (MkConcolic c s) = MkConcolic (fn c) s
+
+instance FiniteBits BV.BV where
+  finiteBitSize bv = BV.width bv
 
 -- Create a new concolic value.
 mkConcolic :: a -> Maybe Z3.AST -> Concolic a
@@ -74,20 +90,18 @@ getSymbolicDef (MkConcolic c s) = do
 -- LibRISCV.Machine.Interpreter for the concrete part of the concolic
 -- value. For the symbolic part, the evalE implementation from the
 -- SymEx.Symbolic module is used.
---
--- The expression language is only implemented on 'Concolic Word32'.
 
 -- Perform an unary LibRISCV Expr operation on a concolic value.
 unaryOp ::
   (Z3.MonadZ3 z3) =>
-  E.Expr (Concolic Word32) ->
-  (E.Expr Word32 -> E.Expr Word32) ->
+  E.Expr (Concolic BV.BV) ->
+  (E.Expr BV.BV -> E.Expr BV.BV) ->
   (E.Expr Z3.AST -> E.Expr Z3.AST) ->
-  z3 (Concolic Word32)
+  z3 (Concolic BV.BV)
 unaryOp e fnConc fnSym = do
   (MkConcolic c s) <- evalE e
 
-  let concrete = I.runExpression (fnConc (E.FromImm c))
+  let concrete = I.evalE (fnConc (E.FromImm c))
   symbolic <- case s of
     Just x -> Just <$> S.evalE (fnSym (E.FromImm x))
     Nothing -> pure Nothing
@@ -97,16 +111,16 @@ unaryOp e fnConc fnSym = do
 -- Perform a binary LibRISCV Expr operation on a concolic value.
 binaryOp ::
   (Z3.MonadZ3 z3) =>
-  E.Expr (Concolic Word32) ->
-  E.Expr (Concolic Word32) ->
-  (E.Expr Word32 -> E.Expr Word32 -> E.Expr Word32) ->
+  E.Expr (Concolic BV.BV) ->
+  E.Expr (Concolic BV.BV) ->
+  (E.Expr BV.BV -> E.Expr BV.BV -> E.Expr BV.BV) ->
   (E.Expr Z3.AST -> E.Expr Z3.AST -> E.Expr Z3.AST) ->
-  z3 (Concolic Word32)
+  z3 (Concolic BV.BV)
 binaryOp e1 e2 fnConc fnSym = do
   conc1@(MkConcolic c1 _) <- evalE e1
   conc2@(MkConcolic c2 _) <- evalE e2
 
-  let concrete = I.runExpression (fnConc (E.FromImm c1) (E.FromImm c2))
+  let concrete = I.evalE (fnConc (E.FromImm c1) (E.FromImm c2))
   if hasSymbolic conc1 || hasSymbolic conc2
     then do
       s1 <- getSymbolicDef conc1
@@ -118,24 +132,28 @@ binaryOp e1 e2 fnConc fnSym = do
 
 {- ORMOLU_DISABLE -}
 -- Evaluate a LibRISCV expression on a 'Concolic' value.
-evalE :: Z3.MonadZ3 z3 => E.Expr (Concolic Word32) -> z3 (Concolic Word32)
-evalE (E.FromImm e)  = pure e
-evalE (E.FromUInt v) = pure $ mkConcrete v
-evalE (E.ZExtByte e) = unaryOp e E.ZExtByte E.ZExtByte
-evalE (E.ZExtHalf e) = unaryOp e E.ZExtHalf E.ZExtHalf
-evalE (E.SExtByte e) = unaryOp e E.SExtByte E.SExtByte
-evalE (E.SExtHalf e) = unaryOp e E.SExtHalf E.SExtHalf
-evalE (E.Add e1 e2)  = binaryOp e1 e2 E.Add E.Add
-evalE (E.Sub e1 e2)  = binaryOp e1 e2 E.Sub E.Sub
-evalE (E.Eq e1 e2)   = binaryOp e1 e2 E.Eq E.Eq
-evalE (E.Slt e1 e2)  = binaryOp e1 e2 E.Slt E.Slt
-evalE (E.Sge e1 e2)  = binaryOp e1 e2 E.Sge E.Sge
-evalE (E.Ult e1 e2)  = binaryOp e1 e2 E.Ult E.Ult
-evalE (E.Uge e1 e2)  = binaryOp e1 e2 E.Uge E.Uge
-evalE (E.And e1 e2)  = binaryOp e1 e2 E.And E.And
-evalE (E.Or e1 e2)   = binaryOp e1 e2 E.Or E.Or
-evalE (E.Xor e1 e2)  = binaryOp e1 e2 E.Xor E.Xor
-evalE (E.LShl e1 e2) = binaryOp e1 e2 E.LShl E.LShl
-evalE (E.LShr e1 e2) = binaryOp e1 e2 E.LShr E.LShr
-evalE (E.AShr e1 e2) = binaryOp e1 e2 E.AShr E.AShr
+evalE :: Z3.MonadZ3 z3 => E.Expr (Concolic BV.BV) -> z3 (Concolic BV.BV)
+evalE (E.FromImm e)     = pure e
+evalE (E.FromInt n v)   = pure $ mkConcrete (BV.bitVec n v)
+evalE (E.ZExt n e)      = unaryOp e (E.ZExt n) (E.ZExt n)
+evalE (E.SExt n e)      = unaryOp e (E.SExt n) (E.SExt n)
+evalE (E.Extract i l e) = unaryOp e (E.Extract i l) (E.Extract i l)
+evalE (E.Add e1 e2)     = binaryOp e1 e2 E.Add E.Add
+evalE (E.Sub e1 e2)     = binaryOp e1 e2 E.Sub E.Sub
+evalE (E.Eq e1 e2)      = binaryOp e1 e2 E.Eq E.Eq
+evalE (E.Slt e1 e2)     = binaryOp e1 e2 E.Slt E.Slt
+evalE (E.Sge e1 e2)     = binaryOp e1 e2 E.Sge E.Sge
+evalE (E.Ult e1 e2)     = binaryOp e1 e2 E.Ult E.Ult
+evalE (E.Uge e1 e2)     = binaryOp e1 e2 E.Uge E.Uge
+evalE (E.And e1 e2)     = binaryOp e1 e2 E.And E.And
+evalE (E.Or e1 e2)      = binaryOp e1 e2 E.Or E.Or
+evalE (E.Xor e1 e2)     = binaryOp e1 e2 E.Xor E.Xor
+evalE (E.LShl e1 e2)    = binaryOp e1 e2 E.LShl E.LShl
+evalE (E.LShr e1 e2)    = binaryOp e1 e2 E.LShr E.LShr
+evalE (E.AShr e1 e2)    = binaryOp e1 e2 E.AShr E.AShr
+evalE (E.Mul e1 e2)     = binaryOp e1 e2 E.Mul E.Mul
+evalE (E.SDiv e1 e2)    = binaryOp e1 e2 E.SDiv E.SDiv
+evalE (E.UDiv e1 e2)    = binaryOp e1 e2 E.UDiv E.UDiv
+evalE (E.SRem e1 e2)    = binaryOp e1 e2 E.SRem E.SRem
+evalE (E.URem e1 e2)    = binaryOp e1 e2 E.URem E.URem
 {- ORMOLU_ENABLE -}

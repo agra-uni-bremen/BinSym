@@ -7,18 +7,17 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
-module SymEx.Interpreter (symBehavior) where
+module SymEx.Interpreter (symBehavior, symEval) where
 
-import Control.Monad (when)
 import Control.Monad.Freer
 import Control.Monad.IO.Class (liftIO)
+import qualified Data.BitVector as BV
 import Data.IORef (IORef, readIORef, writeIORef)
 import Data.Word (Word32)
 import LibRISCV (RegIdx (..))
-import qualified LibRISCV.Decoder.Instruction as I
-import qualified LibRISCV.Machine.Register as REG
-import qualified LibRISCV.Spec.Expr as E
-import LibRISCV.Spec.Operations (Operations (..))
+import LibRISCV.Effects.Expressions.Language
+import qualified LibRISCV.Effects.Operations.Default.Machine.Register as REG
+import LibRISCV.Effects.Operations.Language (Operations (..), Size (..))
 import SymEx.ArchState
 import SymEx.Concolic
 import qualified SymEx.Memory as MEM
@@ -28,9 +27,10 @@ import qualified Z3.Monad as Z3
 
 ------------------------------------------------------------------------
 
-type SymEnv m = (E.Expr (Concolic Word32) -> m (Concolic Word32), ArchState)
-
-getRegIdx :: Concolic Word32 -> RegIdx
+-- Convert a concolic value to a register index. This function assumes
+-- that a concolic value, used to index the register file, never has a
+-- symbolic part.
+getRegIdx :: Concolic BV.BV -> RegIdx
 getRegIdx = toEnum . fromIntegral . getConcrete
 
 -- Track a new branch in the execution trace.
@@ -44,7 +44,7 @@ trackBranch ref wasTrue cond = do
 -- is, if the concolic value has a symbolic part add a constraint to
 -- the execution trace which ensures that it matches the concrete part
 -- for this execution.
-concretize :: (Z3.MonadZ3 z3) => IORef ExecTrace -> Concolic Word32 -> z3 Word32
+concretize :: (Z3.MonadZ3 z3) => IORef ExecTrace -> Concolic BV.BV -> z3 Word32
 concretize ref value = do
   let conc = getConcrete value
   case getSymbolic value of
@@ -54,82 +54,63 @@ concretize ref value = do
         trace <- readIORef ref
         writeIORef ref $ appendCons trace eq
     Nothing -> pure ()
-  pure conc
+  pure $ fromIntegral conc
 
-symBehavior :: (Z3.MonadZ3 z3) => SymEnv z3 -> Operations (Concolic Word32) ~> z3
-symBehavior env@(eval, state@(MkArchState regFile mem ref)) = \case
-  DecodeRS1 instr -> pure . mkConcrete . I.mkRs1 $ getConcrete instr
-  DecodeRS2 instr -> pure . mkConcrete . I.mkRs2 $ getConcrete instr
-  DecodeRD instr -> pure . mkConcrete . I.mkRd $ getConcrete instr
-  DecodeImmB instr -> pure . mkConcrete . I.immB $ getConcrete instr
-  DecodeImmS instr -> pure . mkConcrete . I.immS $ getConcrete instr
-  DecodeImmU instr -> pure . mkConcrete . I.immU $ getConcrete instr
-  DecodeImmI instr -> pure . mkConcrete . I.immI $ getConcrete instr
-  DecodeImmJ instr -> pure . mkConcrete . I.immJ $ getConcrete instr
-  DecodeShamt instr -> pure . mkConcrete . I.mkShamt $ getConcrete instr
-  RunIf cond next -> do
-    conc <- evalE cond
-
-    let mayBeTrue = getConcrete conc == 1
-    when mayBeTrue $ do
-      symBehavior env next
-
-    case getSymbolic conc of
-      Just br -> trackBranch ref mayBeTrue br
-      Nothing -> pure ()
-  RunUnless cond next -> do
-    conc <- evalE cond
-
-    let mayBeFalse = getConcrete conc == 0
-    when mayBeFalse $ do
-      symBehavior env next
-
-    case getSymbolic conc of
-      -- Track branch check for ==1 if True is supplied here.
-      -- Hence, we need to negate mayBeFalse here as we want ==0.
-      Just br -> trackBranch ref (not mayBeFalse) br
-      Nothing -> pure ()
+-- Implementation of the LibRISCV Operations effect.
+symBehavior :: (Z3.MonadZ3 z3) => ArchState -> Operations (Concolic BV.BV) ~> z3
+symBehavior state@(MkArchState regFile mem ref) = \case
   ReadRegister idx -> do
-    conc <- evalE $ E.FromImm idx
-    liftIO $ REG.readRegister regFile (getRegIdx conc)
-  WriteRegister idx val -> do
-    conc <- evalE $ E.FromImm idx
-    value <- evalE val
-    liftIO $ REG.writeRegister regFile (getRegIdx conc) value
-  LoadByte a -> do
-    addr <- evalE a >>= concretize ref
-    byte <- MEM.loadByte mem addr
-    pure $ fmap fromIntegral byte
-  LoadHalf a -> do
-    addr <- evalE a >>= concretize ref
-    half <- MEM.loadHalf mem addr
-    pure $ fmap fromIntegral half
-  LoadWord a -> do
-    addr <- evalE a >>= concretize ref
-    MEM.loadWord mem addr
-  LoadInstr a -> do
-    addr <- evalE a >>= concretize ref
-    inst <- MEM.loadWord mem addr
-    pure (getConcrete inst, inst)
-  StoreByte a v -> do
-    addr <- evalE a >>= concretize ref
-    value <- evalE v
-    MEM.storeByte mem addr (fmap fromIntegral value)
-  StoreHalf a v -> do
-    addr <- evalE a >>= concretize ref
-    value <- evalE v
-    MEM.storeHalf mem addr (fmap fromIntegral value)
-  StoreWord a v -> do
-    addr <- evalE a >>= concretize ref
-    value <- evalE v
-    MEM.storeWord mem addr value
+    word <- liftIO $ REG.readRegister regFile (getRegIdx idx)
+    pure $ fmap (BV.bitVec 32) word
+  WriteRegister idx value -> do
+    let word = fmap fromIntegral value
+    liftIO $ REG.writeRegister regFile (getRegIdx idx) word
+  -- TODO: Refactor the Memory.hs for the new Load consturctor
+  Load size a -> do
+    addr <- concretize ref a
+    case size of
+      Byte -> fmap (BV.bitVec 8) <$> MEM.loadByte mem addr
+      Half -> fmap (BV.bitVec 16) <$> MEM.loadHalf mem addr
+      Word -> fmap (BV.bitVec 32) <$> MEM.loadWord mem addr
+  -- TODO: Refactor the Memory.hs for the new Store consturctor
+  Store size a v -> do
+    addr <- concretize ref a
+    case size of
+      Byte -> MEM.storeByte mem addr (fmap fromIntegral v)
+      Half -> MEM.storeHalf mem addr (fmap fromIntegral v)
+      Word -> MEM.storeWord mem addr (fmap fromIntegral v)
   WritePC newPC -> do
-    conc <- eval newPC
-    liftIO $ REG.writePC regFile (getConcrete conc)
-  ReadPC -> mkConcrete <$> liftIO (REG.readPC regFile)
+    liftIO $ REG.writePC regFile (fromIntegral $ getConcrete newPC)
+  ReadPC -> mkConcrete . BV.bitVec 32 <$> liftIO (REG.readPC regFile)
   Exception _ msg -> error "runtime exception" msg
   Ecall _ -> do
     sys <- liftIO $ REG.readRegister regFile A7
     execSyscall state (getConcrete sys)
   Ebreak _ -> liftIO $ putStrLn "EBREAK"
-  Append__ s s' -> symBehavior env s >> symBehavior env s'
+
+-- Implementation of the LibRISCV expression language effect.
+--
+-- This implementation assumes that the EvalBool constructor is
+-- only used for branch instruction and hence traces all evalCond
+-- invocations where the condition has a symbolic value.
+symEval :: (Z3.MonadZ3 z3) => IORef ExecTrace -> ExprEval (Concolic BV.BV) ~> z3
+symEval ref = \case
+  Eval e -> evalE e
+  IsTrue e -> do
+    conc <- evalE e
+
+    let mayBeTrue = getConcrete conc == 1
+    case getSymbolic conc of
+      Just br -> trackBranch ref mayBeTrue br
+      Nothing -> pure ()
+
+    pure mayBeTrue
+  IsFalse e -> do
+    conc <- evalE e
+
+    let mayBeFalse = getConcrete conc == 0
+    case getSymbolic conc of
+      Just br -> trackBranch ref (not mayBeFalse) br
+      Nothing -> pure ()
+
+    pure mayBeFalse

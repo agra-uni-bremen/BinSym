@@ -2,6 +2,7 @@ module Util where
 
 import Data.Bits (FiniteBits)
 import Data.Maybe (catMaybes, fromJust)
+import Data.Word (Word32)
 import SymEx.Concolic
 import qualified Z3.Monad as Z3
 
@@ -23,3 +24,7 @@ getInt :: (Z3.MonadZ3 z3) => Z3.AST -> z3 (Maybe Integer)
 getInt v = do
   ints <- getInts [v]
   pure $ head <$> ints
+
+-- Extract a Word32 from a Z3 bit-vector.
+getWord32 :: (Z3.MonadZ3 z3) => Z3.AST -> z3 Word32
+getWord32 ast = fromIntegral <$> Z3.getInt ast

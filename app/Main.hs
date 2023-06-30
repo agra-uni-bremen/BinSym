@@ -1,21 +1,21 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Main where
 
 import Control.Monad (when)
-import Control.Monad.Freer (runM)
-import Control.Monad.Freer.Reader (runReader)
+import Control.Monad.Freer (interpretM, runM)
 import Control.Monad.IO.Class (liftIO)
-import Data.IORef (readIORef)
+import qualified Data.BitVector as BV
+import Data.IORef (newIORef, readIORef)
 import Data.Word (Word32)
 import LibRISCV (Address, RegIdx (A0, SP))
 import LibRISCV.CmdLine (BasicArgs (BasicArgs, file, memAddr, memStart), basicArgs)
-import LibRISCV.Effects.Logging.InstructionFetch (runLogInstructionFetchM, runNoLogging)
+import LibRISCV.Effects.Decoding.Default.Interpreter (defaultDecoding)
+import LibRISCV.Effects.Logging.Default.Interpreter (defaultLogging, noLogging)
+import LibRISCV.Effects.Operations.Default.Machine.Register (writeRegister)
 import LibRISCV.Loader (loadElf, readElf, startAddr)
-import LibRISCV.Machine.Interpreter (runInstruction)
-import LibRISCV.Machine.Register (writeRegister)
-import LibRISCV.Spec.AST (buildAST)
+import LibRISCV.Semantics.Default (buildAST)
 import LibRISCV.Utils (align)
 import Options.Applicative
 import SymEx.ArchState
@@ -48,7 +48,7 @@ symbolicArgs =
 -- TODO: Add proper data type to track all symbolic execution state.
 type EntryState = (MEM.Memory, Address)
 
-runPath :: forall z3. (Z3.MonadZ3 z3) => BasicArgs -> EntryState -> S.Store -> z3 ExecTrace
+runPath :: BasicArgs -> EntryState -> S.Store -> Z3.Z3 ExecTrace
 runPath (BasicArgs memBegin memSize verbose putReg _) (mem, entry) store = do
   state <- liftIO $ fromMemory mem
   let regs = getRegs state
@@ -56,18 +56,20 @@ runPath (BasicArgs memBegin memSize verbose putReg _) (mem, entry) store = do
   -- Let stack pointer start at end of memory by default.
   -- It must be possible to perform a LW with this address.
   let initalSP = align (memBegin + memSize - 1)
-  liftIO $ writeRegister regs SP (mkConcrete initalSP)
 
   -- Make register A0 unconstrained symbolic for testing purposes
   symReg <- S.getConcolic store "A0"
   liftIO $ writeRegister regs A0 symReg
 
+  instRef <- liftIO $ newIORef (0 :: Word32)
   let interpreter =
-        if verbose
-          then runReader (evalE @z3, state) . runInstruction symBehavior . runLogInstructionFetchM
-          else runReader (evalE @z3, state) . runInstruction symBehavior . runNoLogging
-
-  runM $ interpreter (buildAST @(Concolic Word32) $ mkConcrete entry)
+        interpretM (symBehavior state)
+          . interpretM (symEval $ getTrace state)
+          . interpretM (defaultDecoding @(Concolic BV.BV) instRef)
+          . interpretM (if verbose then defaultLogging else noLogging)
+  runM $ interpreter $ do
+    liftIO $ writeRegister regs SP (mkConcrete initalSP)
+    buildAST @32 (mkConcrete $ BV.bitVec 32 entry)
 
   ret <- liftIO $ readIORef (getTrace state)
   when putReg $
@@ -75,7 +77,7 @@ runPath (BasicArgs memBegin memSize verbose putReg _) (mem, entry) store = do
       dumpState state
   pure ret
 
-runAll :: forall z3. (Z3.MonadZ3 z3) => Int -> BasicArgs -> EntryState -> S.Store -> Maybe ExecTree -> z3 Int
+runAll :: Int -> BasicArgs -> EntryState -> S.Store -> Maybe ExecTree -> Z3.Z3 Int
 runAll numPaths args es store tree = do
   liftIO $ putStrLn $ "\n##\n# " ++ show numPaths ++ "th concolic execution\n##\n"
   trace <- runPath args es store
@@ -97,7 +99,7 @@ runAll numPaths args es store tree = do
 
 ------------------------------------------------------------------------
 
-main' :: forall z3. (Z3.MonadZ3 z3) => SymbolicArgs -> z3 ()
+main' :: SymbolicArgs -> Z3.Z3 ()
 main' (SymbolicArgs seed args@(BasicArgs {memAddr = ma, memStart = ms, file = fp})) = do
   -- Initial memory state, copied for each execution
   mem <- MEM.mkMemory ma ms

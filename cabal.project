@@ -3,7 +3,7 @@ packages: *.cabal
 source-repository-package
     type: git
     location: git@github.com:nmeum/libriscv.git
-    tag: 550ad0be71ae42b899c7b5afda4999dceff4d651
+    tag: 5e1712a97745e6eeb162df207f7bc88dcf708617
 
 source-repository-package
     type: git

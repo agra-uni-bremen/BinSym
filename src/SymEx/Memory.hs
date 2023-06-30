@@ -20,7 +20,7 @@ import Data.Bits (FiniteBits, finiteBitSize)
 import qualified Data.ByteString.Lazy as BSL
 import Data.Word (Word16, Word32, Word8)
 import LibRISCV (Address)
-import qualified LibRISCV.Machine.Memory as M
+import qualified LibRISCV.Effects.Operations.Default.Machine.Memory as M
 import SymEx.Concolic
 import SymEx.Util
 import qualified Z3.Monad as Z3
