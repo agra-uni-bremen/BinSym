@@ -59,7 +59,7 @@ runPath (BasicArgs memBegin memSize verbose putReg _) (mem, entry) store = do
 
   -- Make register A0 unconstrained symbolic for testing purposes
   symReg <- S.getConcolic store "A0"
-  liftIO $ writeRegister regs A0 symReg
+  liftIO $ writeRegister regs A0 (fmap fromIntegral symReg)
 
   instRef <- liftIO $ newIORef (0 :: Word32)
   let interpreter =
