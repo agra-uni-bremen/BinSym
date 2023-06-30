@@ -37,7 +37,7 @@ mkMemory memStart size = do
   pure $ MkMemory memStart ary
 
 copyMemory :: (MonadIO m) => Memory -> m Memory
-copyMemory (MkMemory s a) = MkMemory s <$> (liftIO $ copyArray a)
+copyMemory (MkMemory s a) = MkMemory s <$> liftIO (copyArray a)
 
 -- Translate global address to a memory-local address.
 toMemAddr :: Memory -> Address -> Address

@@ -46,7 +46,7 @@ instance Functor Concolic where
   fmap fn (MkConcolic c s) = MkConcolic (fn c) s
 
 instance FiniteBits BV.BV where
-  finiteBitSize bv = BV.width bv
+  finiteBitSize = BV.width
 
 -- Create a new concolic value.
 mkConcolic :: a -> Maybe Z3.AST -> Concolic a

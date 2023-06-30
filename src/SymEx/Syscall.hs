@@ -15,7 +15,7 @@ sysExit c = exitWith (ExitFailure $ fromIntegral c)
 
 execSyscall :: (Z3.MonadZ3 z3) => ArchState -> Word32 -> z3 ()
 execSyscall state sysNum = do
-  a0 <- getConcrete <$> (liftIO $ REG.readRegister (getRegs state) A0)
+  a0 <- getConcrete <$> liftIO (REG.readRegister (getRegs state) A0)
 
   case sysNum of
     93 -> liftIO $ sysExit a0
