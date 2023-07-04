@@ -1,3 +1,3 @@
 #!/bin/sh
 set -x
-riscv-none-elf-gcc -march=rv32i -mabi=ilp32 -nostdlib -o main main.S
+riscv-none-elf-gcc -march=rv32i -mabi=ilp32 -nostartfiles -o main start.S main.c
