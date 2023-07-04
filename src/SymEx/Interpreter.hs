@@ -58,7 +58,7 @@ concretize ref value = do
 
 -- Implementation of the LibRISCV Operations effect.
 symBehavior :: (Z3.MonadZ3 z3) => ArchState -> Operations (Concolic BV.BV) ~> z3
-symBehavior state@(MkArchState regFile mem ref) = \case
+symBehavior state@(MkArchState regFile mem ref _) = \case
   ReadRegister idx -> do
     word <- liftIO $ REG.readRegister regFile (getRegIdx idx)
     pure $ fmap (BV.bitVec 32) word

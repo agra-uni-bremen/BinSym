@@ -14,24 +14,26 @@ import qualified LibRISCV.Effects.Operations.Default.Machine.Register as REG
 import Numeric (showHex)
 import SymEx.Concolic
 import qualified SymEx.Memory as MEM
+import SymEx.Store (Store)
 import SymEx.Tracer (ExecTrace, newExecTrace)
 
 data ArchState = MkArchState
   { getRegs :: REG.RegisterFile IOArray (Concolic Word32),
     getMem :: MEM.Memory,
-    getTrace :: IORef ExecTrace
+    getTrace :: IORef ExecTrace,
+    getStore :: Store
   }
 
-mkArchState :: Address -> Word32 -> IO ArchState
-mkArchState memStart memSize = do
+mkArchState :: Store -> Address -> Word32 -> IO ArchState
+mkArchState store memStart memSize = do
   mem <- MEM.mkMemory memStart memSize
-  fromMemory mem
+  fromMemory store mem
 
-fromMemory :: MEM.Memory -> IO ArchState
-fromMemory mem = do
+fromMemory :: Store -> MEM.Memory -> IO ArchState
+fromMemory store mem = do
   reg <- REG.mkRegFile $ mkConcrete 0
   ref <- newIORef newExecTrace
-  pure $ MkArchState reg mem ref
+  pure $ MkArchState reg mem ref store
 
 dumpState :: ArchState -> IO ()
 dumpState MkArchState {getRegs = r} = REG.dumpRegs (showHex . getConcrete) r >>= putStr

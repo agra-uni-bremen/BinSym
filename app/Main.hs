@@ -50,7 +50,7 @@ type EntryState = (MEM.Memory, Address)
 
 runPath :: BasicArgs -> EntryState -> S.Store -> Z3.Z3 ExecTrace
 runPath (BasicArgs memBegin memSize verbose putReg _) (mem, entry) store = do
-  state <- liftIO $ fromMemory mem
+  state <- liftIO $ fromMemory store mem
   let regs = getRegs state
 
   -- Let stack pointer start at end of memory by default.
