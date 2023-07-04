@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeApplications #-}
 
-module SymEx.Store (Store, empty, fromModel, getConcolic) where
+module SymEx.Store (Store, empty, fromModel, getConcolic, concolicBytes) where
 
 import Control.Exception (assert)
 import Control.Monad.IO.Class (MonadIO, liftIO)
@@ -64,5 +64,11 @@ getOrRand (MkStore m) name size = do
 
 -- Obtain a unconstrained concolic value from the store.
 -- The concrete part is taken from the store or random.
-getConcolic :: (Z3.MonadZ3 z3) => Store -> String -> z3 (Concolic BV.BV)
-getConcolic store name = getOrRand store name 32 >>= flip mkUncons name
+getConcolic :: (Z3.MonadZ3 z3) => Store -> String -> Int -> z3 (Concolic BV.BV)
+getConcolic store name size = getOrRand store name size >>= flip mkUncons name
+
+-- Obtain a list of concolic bytes from the store.
+-- The concrete part is taken from the store or random.
+concolicBytes :: (Z3.MonadZ3 z3) => Store -> String -> Int -> z3 [Concolic BV.BV]
+concolicBytes store name amount =
+  mapM (\n -> getConcolic store (name ++ ":byte" ++ show n) 8) [1 .. amount]
