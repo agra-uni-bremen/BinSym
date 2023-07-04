@@ -9,7 +9,7 @@ import Control.Monad.IO.Class (liftIO)
 import qualified Data.BitVector as BV
 import Data.IORef (newIORef, readIORef)
 import Data.Word (Word32)
-import LibRISCV (Address, RegIdx (A0, SP))
+import LibRISCV (Address, RegIdx (SP))
 import LibRISCV.CmdLine (BasicArgs (BasicArgs, file, memAddr, memStart), basicArgs)
 import LibRISCV.Effects.Decoding.Default.Interpreter (defaultDecoding)
 import LibRISCV.Effects.Logging.Default.Interpreter (defaultLogging, noLogging)
@@ -56,10 +56,6 @@ runPath (BasicArgs memBegin memSize verbose putReg _) (mem, entry) store = do
   -- Let stack pointer start at end of memory by default.
   -- It must be possible to perform a LW with this address.
   let initalSP = align (memBegin + memSize - 1)
-
-  -- Make register A0 unconstrained symbolic for testing purposes
-  symReg <- S.getConcolic store "A0" 32
-  liftIO $ writeRegister regs A0 (fmap fromIntegral symReg)
 
   instRef <- liftIO $ newIORef (0 :: Word32)
   let interpreter =
