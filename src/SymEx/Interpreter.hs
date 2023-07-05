@@ -15,9 +15,10 @@ import qualified Data.BitVector as BV
 import Data.IORef (IORef, readIORef, writeIORef)
 import Data.Word (Word32)
 import LibRISCV (RegIdx (..))
+import qualified LibRISCV.Effects.Expressions.Expr as E
 import LibRISCV.Effects.Expressions.Language
 import qualified LibRISCV.Effects.Operations.Default.Machine.Register as REG
-import LibRISCV.Effects.Operations.Language (Operations (..), Size (..))
+import LibRISCV.Effects.Operations.Language (Operations (..), Size (..), bitSize)
 import SymEx.ArchState
 import SymEx.Concolic
 import qualified SymEx.Memory as MEM
@@ -75,10 +76,15 @@ symBehavior state@(MkArchState regFile mem ref _) = \case
   -- TODO: Refactor the Memory.hs for the new Store consturctor
   Store size a v -> do
     addr <- concretize ref a
+
+    -- TODO: Perform value truncation in Memory.hs
+    -- Alternatively move the extract into the semantics description.
+    trunc <- evalE (E.Extract 0 (bitSize size) $ E.FromImm v)
+
     case size of
-      Byte -> MEM.storeByte mem addr (fmap fromIntegral v)
-      Half -> MEM.storeHalf mem addr (fmap fromIntegral v)
-      Word -> MEM.storeWord mem addr (fmap fromIntegral v)
+      Byte -> MEM.storeByte mem addr (fmap fromIntegral trunc)
+      Half -> MEM.storeHalf mem addr (fmap fromIntegral trunc)
+      Word -> MEM.storeWord mem addr (fmap fromIntegral trunc)
   WritePC newPC -> do
     liftIO $ REG.writePC regFile (fromIntegral $ getConcrete newPC)
   ReadPC -> mkConcrete . BV.bitVec 32 <$> liftIO (REG.readPC regFile)
