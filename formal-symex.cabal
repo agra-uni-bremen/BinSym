@@ -31,7 +31,7 @@ library
                     , SymEx.Store
                     , SymEx.Syscall
 
-    build-depends:    base   ^>=4.17.1.0
+    build-depends:    base    >=4.15.0.0
                     , random ^>=1.2.1.1
                     , z3
                     , libriscv
@@ -47,7 +47,7 @@ executable riscv-symex
     hs-source-dirs:       app
     default-language:     Haskell2010
     build-depends:
-                      base ^>=4.17.1.0
+                      base >=4.15.0.0
                     , formal-symex
                     , libriscv
                     , optparse-applicative
