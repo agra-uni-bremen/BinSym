@@ -2,8 +2,8 @@ packages: *.cabal
 
 source-repository-package
     type: git
-    location: git@github.com:nmeum/libriscv.git
-    tag: be2db8db871901be7003f7b20cb135c7bc9b791d
+    location: https://github.com/agra-uni-bremen/libriscv.git
+    tag: eafd03f4674c4f09ce070b8a21b10db879a22ece
 
 source-repository-package
     type: git
