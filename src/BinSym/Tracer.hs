@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 
-module SymEx.Tracer
+module BinSym.Tracer
   ( Branch,
     newBranch,
     ExecTrace,
@@ -15,9 +15,9 @@ module SymEx.Tracer
   )
 where
 
+import qualified BinSym.Cond as Cond
 import Control.Applicative ((<|>))
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import qualified SymEx.Cond as Cond
 import System.Random (randomIO)
 import qualified Z3.Monad as Z3
 

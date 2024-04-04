@@ -1,14 +1,14 @@
-module SymEx.Syscall (execSyscall) where
+module BinSym.Syscall (execSyscall) where
 
+import BinSym.ArchState
+import BinSym.Concolic
+import qualified BinSym.Memory as MEM
+import BinSym.Store (concolicBytes)
 import Control.Monad.IO.Class (liftIO)
 import Data.Word (Word32)
 import LibRISCV (Address, RegIdx (A0, A1))
 import qualified LibRISCV.Effects.Operations.Default.Machine.Register as REG
 import Numeric (showHex)
-import SymEx.ArchState
-import SymEx.Concolic
-import qualified SymEx.Memory as MEM
-import SymEx.Store (concolicBytes)
 import System.Exit
 import qualified Z3.Monad as Z3
 

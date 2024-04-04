@@ -1,5 +1,5 @@
 cabal-version:      3.0
-name:               formal-symex
+name:               binsym
 version:            0.1.0.0
 synopsis:
     A symbolic execution tool for RISC-V machine code based on the formal LibRISCV ISA model
@@ -20,16 +20,16 @@ library
     hs-source-dirs:   src
     default-language: Haskell2010
 
-    exposed-modules:  SymEx.Interpreter
-                    , SymEx.ArchState
-                    , SymEx.Util
-                    , SymEx.Memory
-                    , SymEx.Cond
-                    , SymEx.Symbolic
-                    , SymEx.Concolic
-                    , SymEx.Tracer
-                    , SymEx.Store
-                    , SymEx.Syscall
+    exposed-modules:  BinSym.Interpreter
+                    , BinSym.ArchState
+                    , BinSym.Util
+                    , BinSym.Memory
+                    , BinSym.Cond
+                    , BinSym.Symbolic
+                    , BinSym.Concolic
+                    , BinSym.Tracer
+                    , BinSym.Store
+                    , BinSym.Syscall
 
     build-depends:    base    >=4.15.0.0
                     , random ^>=1.2.1.1
@@ -48,7 +48,7 @@ executable riscv-symex
     default-language:     Haskell2010
     build-depends:
                       base >=4.15.0.0
-                    , formal-symex
+                    , binsym
                     , libriscv
                     , optparse-applicative
                     , random
@@ -73,6 +73,6 @@ test-suite test
         base          >= 4.15.0.0
       , tasty        ^>= 1.4.2.3
       , tasty-hunit  ^>= 0.10.0.3
-      , formal-symex
+      , binsym
       , libriscv
       , z3

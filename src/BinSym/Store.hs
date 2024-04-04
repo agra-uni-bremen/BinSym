@@ -1,7 +1,8 @@
 {-# LANGUAGE TypeApplications #-}
 
-module SymEx.Store (Store, empty, fromModel, getConcolic, concolicBytes) where
+module BinSym.Store (Store, empty, fromModel, getConcolic, concolicBytes) where
 
+import BinSym.Concolic
 import Control.Exception (assert)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Bifunctor (second)
@@ -9,7 +10,6 @@ import qualified Data.BitVector as BV
 import Data.List (intercalate)
 import qualified Data.Map.Strict as Map
 import Numeric (readHex)
-import SymEx.Concolic
 import System.Random (randomIO)
 import qualified Z3.Monad as Z3
 

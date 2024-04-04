@@ -6,7 +6,7 @@
 -- See: https://gitlab.haskell.org/ghc/ghc/-/issues/602
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module SymEx.Concolic
+module BinSym.Concolic
   ( Concolic (..),
     mkConcolic,
     mkConcrete,
@@ -19,13 +19,13 @@ module SymEx.Concolic
   )
 where
 
+import qualified BinSym.Symbolic as S
 import qualified Data.BitVector as BV
 import Data.Bits (FiniteBits, finiteBitSize)
 import Data.Maybe (fromMaybe)
 import LibRISCV.Effects.Decoding.Default.Interpreter (Decodable (..))
 import qualified LibRISCV.Effects.Expressions.Default.EvalE as I
 import qualified LibRISCV.Effects.Expressions.Expr as E
-import qualified SymEx.Symbolic as S
 import qualified Z3.Monad as Z3
 
 -- Concolic is a tuple of a concrete value (as represented by
@@ -89,7 +89,7 @@ getSymbolicDef (MkConcolic c s) = do
 -- The implementation re-uses the existing implementation of the
 -- LibRISCV.Machine.Interpreter for the concrete part of the concolic
 -- value. For the symbolic part, the evalE implementation from the
--- SymEx.Symbolic module is used.
+-- BinSym.Symbolic module is used.
 
 -- Perform an unary LibRISCV Expr operation on a concolic value.
 unaryOp ::

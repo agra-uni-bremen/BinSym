@@ -3,6 +3,12 @@
 
 module Main where
 
+import BinSym.ArchState
+import BinSym.Concolic
+import BinSym.Interpreter
+import qualified BinSym.Memory as MEM
+import qualified BinSym.Store as S
+import BinSym.Tracer
 import Control.Monad (when)
 import Control.Monad.Freer (interpretM, runM)
 import Control.Monad.IO.Class (liftIO)
@@ -18,12 +24,6 @@ import LibRISCV.Loader (loadElf, readElf, startAddr)
 import LibRISCV.Semantics.Default (buildAST)
 import LibRISCV.Utils (align)
 import Options.Applicative
-import SymEx.ArchState
-import SymEx.Concolic
-import SymEx.Interpreter
-import qualified SymEx.Memory as MEM
-import qualified SymEx.Store as S
-import SymEx.Tracer
 import System.Random (initStdGen, mkStdGen, setStdGen)
 import qualified Z3.Monad as Z3
 

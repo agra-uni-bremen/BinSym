@@ -1,8 +1,8 @@
-module SymEx.Cond (Condition, new, getAST, check, assert, fromResult) where
+module BinSym.Cond (Condition, new, getAST, check, assert, fromResult) where
 
+import BinSym.Util (bvSize, mkSymWord32)
 import qualified Control.Exception as E
 import Data.Word (Word32)
-import SymEx.Util (bvSize, mkSymWord32)
 import qualified Z3.Monad as Z3
 
 newtype Condition = MkCond Z3.AST

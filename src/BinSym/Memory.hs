@@ -1,5 +1,5 @@
 -- TODO: Make this interoperable with LibRISCV.Machine.Memory
-module SymEx.Memory
+module BinSym.Memory
   ( Memory,
     mkMemory,
     copyMemory,
@@ -13,6 +13,8 @@ module SymEx.Memory
   )
 where
 
+import BinSym.Concolic
+import BinSym.Util
 import Control.Exception (assert)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Array.IO (IOArray, MArray (newArray), readArray, writeArray)
@@ -21,8 +23,6 @@ import qualified Data.ByteString.Lazy as BSL
 import Data.Word (Word16, Word32, Word8)
 import LibRISCV (Address)
 import qualified LibRISCV.Effects.Operations.Default.Machine.Memory as M
-import SymEx.Concolic
-import SymEx.Util
 import qualified Z3.Monad as Z3
 
 data Memory = MkMemory

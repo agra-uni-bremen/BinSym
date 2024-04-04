@@ -1,8 +1,8 @@
-module SymEx.Symbolic (evalE) where
+module BinSym.Symbolic (evalE) where
 
+import BinSym.Util
 import Control.Exception (assert)
 import qualified LibRISCV.Effects.Expressions.Expr as E
-import SymEx.Util
 import qualified Z3.Monad as Z3
 
 -- Map a binary operation in the LibRISCV expression language to a Z3 operation.

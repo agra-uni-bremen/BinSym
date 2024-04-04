@@ -7,8 +7,13 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
-module SymEx.Interpreter (symBehavior, symEval) where
+module BinSym.Interpreter (symBehavior, symEval) where
 
+import BinSym.ArchState
+import BinSym.Concolic
+import qualified BinSym.Memory as MEM
+import BinSym.Syscall
+import BinSym.Tracer
 import Control.Monad.Freer
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.BitVector as BV
@@ -19,11 +24,6 @@ import qualified LibRISCV.Effects.Expressions.Expr as E
 import LibRISCV.Effects.Expressions.Language
 import qualified LibRISCV.Effects.Operations.Default.Machine.Register as REG
 import LibRISCV.Effects.Operations.Language (Operations (..), Size (..), bitSize)
-import SymEx.ArchState
-import SymEx.Concolic
-import qualified SymEx.Memory as MEM
-import SymEx.Syscall
-import SymEx.Tracer
 import qualified Z3.Monad as Z3
 
 ------------------------------------------------------------------------

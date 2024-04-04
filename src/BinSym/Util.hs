@@ -1,4 +1,4 @@
-module SymEx.Util
+module BinSym.Util
   ( mkSymWord8,
     mkSymWord32,
     bvSize,
