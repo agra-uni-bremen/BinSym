@@ -21,8 +21,9 @@ for LibRISCV.
 
 ## Installation
 
-BinSym has been developed for GHC 9.4.8 (newer versions may work too). To install
-BinSym run the following commands:
+BinSym has been developed for GHC 9.4.8 (newer versions may work too). Furthermore,
+installation requires [z3] to be installed as a prerequisite. After installing z3,
+you can install BinSym by running the following commands:
 
 	$ git clone https://github.com/agra-uni-bremen/binsym
 	$ cabal install
@@ -52,3 +53,4 @@ in your startup assembly file.
 
 [RISC-V]: https://riscv.org/
 [LibRISCV]: https://github.com/agra-uni-bremen/libriscv
+[z3]: https://github.com/Z3Prover/z3
