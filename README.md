@@ -27,7 +27,7 @@ BinSym run the following commands:
 	$ git clone https://github.com/agra-uni-bremen/binsym
 	$ cabal install
 
-This install a `formal-symex` binary into your path. This binary can be used for
+This install a `riscv-symex` binary into your path. This binary can be used for
 symbolic execution of RV32I machine code. Within this machine code, unconstrained
 symbolic values can be declared based on which the code is then symbolically explored.
 In order to declare a symbolic value, the following code can be used:
