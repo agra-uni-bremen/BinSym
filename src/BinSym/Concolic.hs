@@ -24,7 +24,7 @@ import qualified Data.BitVector as BV
 import Data.Bits (FiniteBits, finiteBitSize)
 import Data.Maybe (fromMaybe)
 import LibRISCV.Effects.Decoding.Default.Interpreter (Decodable (..))
-import qualified LibRISCV.Effects.Expressions.Default.EvalE as I
+import qualified LibRISCV.Effects.Expressions.Default.Interpreter as I
 import qualified LibRISCV.Effects.Expressions.Expr as E
 import qualified Z3.Monad as Z3
 

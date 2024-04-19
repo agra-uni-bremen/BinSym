@@ -15,14 +15,13 @@ import Control.Monad.IO.Class (liftIO)
 import qualified Data.BitVector as BV
 import Data.IORef (newIORef, readIORef)
 import Data.Word (Word32)
-import LibRISCV (Address, RegIdx (SP))
-import LibRISCV.CmdLine (BasicArgs (BasicArgs, file, memAddr, memStart), basicArgs)
+import LibRISCV (Address, RegIdx (SP), align)
+import LibRISCV.CmdLine (BasicArgs (BasicArgs, file, memAddr, memSize), basicArgs)
 import LibRISCV.Effects.Decoding.Default.Interpreter (defaultDecoding)
 import LibRISCV.Effects.Logging.Default.Interpreter (defaultLogging, noLogging)
 import LibRISCV.Effects.Operations.Default.Machine.Register (writeRegister)
 import LibRISCV.Loader (loadElf, readElf, startAddr)
-import LibRISCV.Semantics.Default (buildAST)
-import LibRISCV.Utils (align)
+import LibRISCV.Semantics (buildAST)
 import Options.Applicative
 import System.Random (initStdGen, mkStdGen, setStdGen)
 import qualified Z3.Monad as Z3
@@ -49,13 +48,13 @@ symbolicArgs =
 type EntryState = (MEM.Memory, Address)
 
 runPath :: BasicArgs -> EntryState -> S.Store -> Z3.Z3 ExecTrace
-runPath (BasicArgs memBegin memSize verbose putReg _) (mem, entry) store = do
+runPath (BasicArgs memBegin size verbose putReg _) (mem, entry) store = do
   state <- liftIO $ fromMemory store mem
   let regs = getRegs state
 
   -- Let stack pointer start at end of memory by default.
   -- It must be possible to perform a LW with this address.
-  let initalSP = align (memBegin + memSize - 1)
+  let initalSP = align (memBegin + size - 1)
 
   instRef <- liftIO $ newIORef (0 :: Word32)
   let interpreter =
@@ -96,7 +95,7 @@ runAll numPaths args es store tree = do
 ------------------------------------------------------------------------
 
 main' :: SymbolicArgs -> Z3.Z3 ()
-main' (SymbolicArgs seed args@(BasicArgs {memAddr = ma, memStart = ms, file = fp})) = do
+main' (SymbolicArgs seed args@(BasicArgs {memAddr = ma, memSize = ms, file = fp})) = do
   -- Initial memory state, copied for each execution
   mem <- MEM.mkMemory ma ms
   elf <- liftIO $ readElf fp

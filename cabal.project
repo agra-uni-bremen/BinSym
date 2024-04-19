@@ -3,7 +3,7 @@ packages: *.cabal
 source-repository-package
     type: git
     location: https://github.com/agra-uni-bremen/libriscv.git
-    tag: eafd03f4674c4f09ce070b8a21b10db879a22ece
+    tag: e241ea889fc8ff6648f5132afb12fe50c1901e94
 
 source-repository-package
     type: git
@@ -14,3 +14,7 @@ source-repository-package
 --
 -- See: https://github.com/lexi-lambda/freer-simple/issues/40#issuecomment-1438089449
 allow-newer: freer-simple:template-haskell
+
+-- On some versions of Alpine Linux, the text library fails to compile
+-- the vendored simdutf C code. Work around that by disabling the feature.
+constraints: text -simdutf
