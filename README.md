@@ -48,7 +48,9 @@ make_symbolic(void *ptr, size_t size)
 
 BinSym executes the code until it finds the first invalid instruction;
 therefore, in order to terminate an execution path use something along the
-lines of `.word 0xffff` in your startup assembly file.
+lines of `.word 0xffff` in your startup assembly file. A simple example
+program, which enumerates prime numbers symbolically, is available in the
+`examples/prime-numbers` directory.
 
 ## How To Cite
 
