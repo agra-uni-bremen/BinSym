@@ -1,7 +1,7 @@
 module Tracer where
 
-import SymEx.Tracer
-import SymEx.Util
+import BinSym.Tracer
+import BinSym.Util
 import Test.Tasty
 import Test.Tasty.HUnit
 import qualified Z3.Monad as Z3

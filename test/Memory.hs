@@ -1,8 +1,8 @@
 module Memory where
 
-import SymEx.Concolic
-import SymEx.Memory
-import SymEx.Util
+import BinSym.Concolic
+import BinSym.Memory
+import BinSym.Util
 import Test.Tasty
 import Test.Tasty.HUnit
 import Util

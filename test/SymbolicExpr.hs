@@ -1,9 +1,9 @@
 module SymbolicExpr where
 
+import qualified BinSym.Cond as Cond
+import BinSym.Symbolic (evalE)
+import BinSym.Util
 import qualified LibRISCV.Effects.Expressions.Expr as E
-import qualified SymEx.Cond as Cond
-import SymEx.Symbolic (evalE)
-import SymEx.Util
 import Test.Tasty
 import Test.Tasty.HUnit
 import Util

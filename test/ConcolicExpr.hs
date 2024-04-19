@@ -1,9 +1,9 @@
 module ConcolicExpr where
 
+import BinSym.Concolic
+import BinSym.Util (mkSymWord32)
 import Data.Maybe (fromJust)
 import qualified LibRISCV.Effects.Expressions.Expr as E
-import SymEx.Concolic
-import SymEx.Util (mkSymWord32)
 import Test.Tasty
 import Test.Tasty.HUnit
 import Util

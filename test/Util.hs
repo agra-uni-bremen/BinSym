@@ -1,9 +1,9 @@
 module Util where
 
+import BinSym.Concolic
 import Data.Bits (FiniteBits)
 import Data.Maybe (catMaybes, fromJust)
 import Data.Word (Word32)
-import SymEx.Concolic
 import qualified Z3.Monad as Z3
 
 mkSymbolic :: a -> Z3.AST -> Concolic a
