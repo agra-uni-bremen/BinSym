@@ -38,8 +38,9 @@ parseModel input = map (second fromZ3Hex . splitLine) (lines input)
     -- Split "A0 -> #x00000001" into the ("A0, "#x00000001").
     splitLine :: String -> (String, String)
     splitLine line =
-      let w = words line
-       in assert (length w == 3) (head w, last w)
+      case words line of
+        [var, _arrow, value] -> (var, value)
+        _ -> error "unreachable"
 
     -- Parse an input string like "#x00000001" as 0x00000001.
     fromZ3Hex :: String -> BV.BV
