@@ -9,17 +9,14 @@ Symbolic execution of [RISC-V] binary code based on formal instruction semantics
 BinSym is a program analysis tool which enables symbolic execution of binary code.
 The majority of prior work on binary program analysis lifts/transforms binary code
 to an Intermediate Representation (IR) and then analysis this intermediate format.
-BinSym, on the other hand, operates directly on the binary-level at eliminates
+BinSym, on the other hand, operates directly on the binary-level and eliminates
 the need to perform binary lifting. This enables BinSym to capture and reason
 about low-level interactions (e.g. with the architectural state). Furthermore,
 through the utilization of formal instruction semantics, BinSym is more faithful
 to the ISA specification and eliminates the possibilities of errors and inaccuracies
 which may occur during the lifting step in prior work.
 
-The implementation of BinSym is based on our prior work on [LibRISCV]. Specifically,
-BinSym provides actual symbolic semantics for the abstract instruction semantics
-specified in LibRISCV. Or, in other words, BinSym is a symbolic free monad interpreter
-for LibRISCV.
+The implementation of BinSym is based on our prior work on [LibRISCV]. Specifically, BinSym provides actual symbolic semantics for the abstract instruction semantics specified in LibRISCV. Or, in other words, BinSym is a symbolic free monad interpreter for LibRISCV.
 
 ## Installation
 
@@ -30,9 +27,9 @@ you can install BinSym by running the following commands:
 	$ git clone https://github.com/agra-uni-bremen/binsym
 	$ cabal install
 
-This install a `riscv-symex` binary into your path. This binary can be used for
+This installs a `riscv-symex` binary into your PATH. This binary can be used for
 symbolic execution of RV32I machine code. Within this machine code, unconstrained
-symbolic values can be declared based on which the code is then symbolically explored.
+symbolic values can be declared, based on which the code is then symbolically explored.
 In order to declare a symbolic value, the following code can be used:
 
 ```C
@@ -49,9 +46,9 @@ make_symbolic(void *ptr, size_t size)
 }
 ```
 
-BinSym executes the code until it finds the first invalid instruction, therefore
-in order to terminate an execution use something along the lines of `.word 0xffff`
-in your startup assembly file.
+BinSym executes the code until it finds the first invalid instruction;
+therefore, in order to terminate an execution path use something along the
+lines of `.word 0xffff` in your startup assembly file.
 
 ## How To Cite
 
