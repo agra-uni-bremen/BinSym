@@ -17,7 +17,8 @@ where
 
 import qualified BinSym.Cond as Cond
 import Control.Applicative ((<|>))
-import System.Random (StdGen, getStdRandom, split, uniform)
+import Data.Bifunctor (first)
+import System.Random (StdGen, getStdGen, setStdGen, split, uniform)
 import qualified Z3.Monad as Z3
 
 -- Represents a branch condition in the executed code
@@ -176,7 +177,7 @@ negateBranch g (Node (MkBranch wasNeg ast) _ Nothing)
   | wasNeg = Nothing
   | otherwise = Just ([(False, MkBranch True ast)], g)
 negateBranch g (Node br (Just ifTrue) (Just ifFalse)) =
-  -- Random traverse either the true or the false branch first.
+  -- Randomly traverse either the true or the false branch first.
   -- Selecting the first unnegated node in the upper parts of the tree.
   let (gt, gf) = split g'
       truePath = negateBranch gt ifTrue
@@ -184,8 +185,7 @@ negateBranch g (Node br (Just ifTrue) (Just ifFalse)) =
    in makePath br True truePath `select` makePath br False falsePath
   where
     -- Prepend a new branch to a path through the binary tree.
-    makePath :: Branch -> Bool -> Maybe (ExecTrace, StdGen) -> Maybe (ExecTrace, StdGen)
-    makePath branch branchType path = (\(n, ng) -> ((branchType, branch) : n, ng)) <$> path
+    makePath branch branchType path = first ((branchType, branch) :) <$> path
 
     -- Obtain random boolean value to traverse either the true/false first.
     (randValue, g') = uniform g :: (Bool, StdGen)
@@ -205,17 +205,14 @@ findUnexplored tree = do
   -- TODO: Do not rely on the global random number generator here. Instead,
   -- pass an 'StdGen' as an input State to this function. Ideally, use the
   -- same 'StdGen' for generation of 'Concolic' values in 'BinSym.Store'.
-  negated <-
-    getStdRandom
-      ( \g ->
-          case (negateBranch g tree) of
-            Nothing -> (Nothing, g)
-            Just (x, g') -> (Just x, g')
-      )
+  stdgen <- getStdGen
 
-  case negated of
+  case negateBranch stdgen tree of
     Nothing -> pure (Nothing, tree)
-    Just nt -> do
+    Just (nt, stdgen') -> do
+      -- negateBranch used the random number generator, hence update it.
+      setStdGen stdgen'
+
       let nextTree = addTrace tree nt
       solveTrace nt >>= \case
         Nothing -> findUnexplored nextTree
