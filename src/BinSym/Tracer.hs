@@ -17,8 +17,8 @@ where
 
 import qualified BinSym.Cond as Cond
 import Control.Applicative ((<|>))
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import System.Random (randomIO)
+import Control.Monad.IO.Class (MonadIO)
+import System.Random (StdGen, getStdRandom, uniform)
 import qualified Z3.Monad as Z3
 
 -- Represents a branch condition in the executed code
@@ -183,9 +183,13 @@ negateBranch (Node br (Just ifTrue) (Just ifFalse)) = do
 
   -- Random traverse either the true or the false branch first.
   -- Selecting the first unnegated node in the upper parts of the tree.
-  randomValue <- liftIO (randomIO :: IO Int)
+  --
+  -- TODO: Do not rely on the global random number generator here. Instead,
+  -- pass an 'StdGen' as an input State to this function. Ideally, use the
+  -- same 'StdGen' for generation of 'Concolic' values in 'BinSym.Store'.
+  randomBool <- getStdRandom (uniform :: StdGen -> (Bool, StdGen))
   let select =
-        if even randomValue
+        if randomBool
           then (<|>)
           else flip (<|>)
 
