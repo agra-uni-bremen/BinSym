@@ -17,7 +17,8 @@ where
 
 import qualified BinSym.Cond as Cond
 import Control.Applicative ((<|>))
-import Control.Monad.IO.Class (MonadIO)
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import System.IO.Unsafe (unsafeInterleaveIO)
 import System.Random.Stateful (globalStdGen, uniformM)
 import qualified Z3.Monad as Z3
 
@@ -177,9 +178,11 @@ negateBranch (Node (MkBranch wasNeg ast) _ Nothing)
   | wasNeg = pure Nothing
   | otherwise = pure $ Just [(False, MkBranch True ast)]
 negateBranch (Node br (Just ifTrue) (Just ifFalse)) = do
-  -- Traversation of the true/false branch (hopefully lazy evaluated).
-  tb <- negateBranch ifTrue
-  fb <- negateBranch ifFalse
+  -- Traversation of the true/false branch (lazy evaluated).
+  --
+  -- TODO: Make this a pure function and do not rely on unsafe I/O.
+  tb <- liftIO $ (unsafeInterleaveIO $ negateBranch ifTrue)
+  fb <- liftIO $ (unsafeInterleaveIO $ negateBranch ifFalse)
 
   -- Random traverse either the true or the false branch first.
   -- Selecting the first unnegated node in the upper parts of the tree.
