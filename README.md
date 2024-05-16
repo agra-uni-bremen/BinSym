@@ -34,7 +34,7 @@ one can install BinSym by running the following commands:
 This installs a `riscv-symex` binary into your PATH. This binary can be used for
 symbolic execution of RV32IM machine code. As described in the next section.
 
-# Usage
+## Usage
 
 In order to explore 32-bit RISC-V machine code using `riscv-symex`, a symbolic
 value needs to be introduced into the simulation. Presently, this can be
