@@ -16,21 +16,31 @@ through the utilization of formal instruction semantics, BinSym is more faithful
 to the ISA specification and eliminates the possibilities of errors and inaccuracies
 which may occur during the lifting step in prior work.
 
-The implementation of BinSym is based on our prior work on [LibRISCV]. Specifically, BinSym provides actual symbolic semantics for the abstract instruction semantics specified in LibRISCV. Or, in other words, BinSym is a symbolic free monad interpreter for LibRISCV.
+The implementation of BinSym is based on our prior work on [LibRISCV].
+Specifically, BinSym provides actual symbolic semantics for the abstract
+instruction semantics specified in LibRISCV. Or, in other words, BinSym is a
+symbolic free monad interpreter for LibRISCV.
 
 ## Installation
 
 BinSym has been developed for GHC 9.4.8 (newer versions may work too). Furthermore,
-installation requires [z3] to be installed as a prerequisite. After installing z3,
-you can install BinSym by running the following commands:
+installation requires [z3] to be available as a prerequisite. After installing z3,
+one can install BinSym by running the following commands:
 
 	$ git clone https://github.com/agra-uni-bremen/binsym
+	$ cd binsym
 	$ cabal install
 
 This installs a `riscv-symex` binary into your PATH. This binary can be used for
-symbolic execution of RV32I machine code. Within this machine code, unconstrained
-symbolic values can be declared, based on which the code is then symbolically explored.
-In order to declare a symbolic value, the following code can be used:
+symbolic execution of RV32IM machine code. As described in the next section.
+
+# Usage
+
+In order to explore 32-bit RISC-V machine code using `riscv-symex`, a symbolic
+value needs to be introduced into the simulation. Presently, this can be
+achieved through an `ECALL` which must be used from inside the software (i.e.
+the software must be modified to make use of this `ECALL`). In order to declare
+an unconstrained symbolic value via an `ECALL`, the following C code can be used:
 
 ```C
 void
@@ -50,7 +60,9 @@ BinSym executes the code until it finds the first invalid instruction;
 therefore, in order to terminate an execution path use something along the
 lines of `.word 0xffff` in your startup assembly file. A simple example
 program, which enumerates prime numbers symbolically, is available in the
-`examples/prime-numbers` directory.
+`examples/prime-numbers` directory. Presently, BinSym always explores the
+input space in its entirety. Furthermore, no error detection techniques
+have been integrated with BinSym yet.
 
 ## How To Cite
 
