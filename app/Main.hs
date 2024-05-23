@@ -72,9 +72,9 @@ runPath (BasicArgs memBegin size verbose putReg _) (mem, entry) store = do
       dumpState state
   pure ret
 
-runAll :: Int -> BasicArgs -> EntryState -> S.Store -> Maybe ExecTree -> Z3.Z3 Int
-runAll numPaths args es store tree = do
-  liftIO $ putStrLn $ "\n##\n# " ++ show numPaths ++ "th concolic execution\n##\n"
+runAll :: ExecTrace -> Int -> BasicArgs -> EntryState -> S.Store -> Maybe ExecTree -> Z3.Z3 Int
+runAll t numPaths args es store tree = do
+  liftIO $ putStrLn ("Path" ++ show numPaths)
   trace <- runPath args es store
 
   -- newTree is the tree including the trace of the last path.
@@ -84,13 +84,12 @@ runAll numPaths args es store tree = do
 
   -- nextTree is the execution tree with updated metadata for
   -- branch nodes which findUnexplored attempted to negate.
-  (model, nextTree) <- findUnexplored newTree
+  (model, oldTrace, nextTree) <- findUnexplored newTree t
   case model of
     Nothing -> pure numPaths
     Just m -> do
       newStore <- S.fromModel m
-      liftIO $ putStrLn ("\nNext assignment:\n" ++ show newStore)
-      runAll (numPaths + 1) args es newStore (Just nextTree)
+      runAll oldTrace (numPaths + 1) args es newStore (Just nextTree)
 
 ------------------------------------------------------------------------
 
@@ -108,7 +107,7 @@ main' (SymbolicArgs seed args@(BasicArgs {memAddr = ma, memSize = ms, file = fp}
     Nothing -> initStdGen
   liftIO $ setStdGen stdgen
 
-  numPaths <- runAll 1 args (mem, entry) S.empty Nothing
+  numPaths <- runAll [] 1 args (mem, entry) S.empty Nothing
   liftIO $ putStrLn ("\n---\nUnique paths found: " ++ show numPaths)
 
 main :: IO ()
