@@ -16,10 +16,9 @@ module BinSym.Tracer
 where
 
 import qualified BinSym.Cond as Cond
+import BinSym.Util (prefixLength)
 import Control.Applicative ((<|>))
-import Control.Monad (when)
-import Control.Monad.IO.Class (liftIO)
-import System.Exit
+import Data.List (unsnoc)
 import qualified Z3.Monad as Z3
 
 -- Represents a branch condition in the executed code
@@ -63,37 +62,28 @@ appendCons trace cons = trace ++ [(True, MkBranch True cons)]
 -- as a 'Z3.Model') which statisfies all symbolic branch conditions.
 -- If such an assignment does not exist, then 'Nothing' is returned.
 solveTrace :: (Z3.MonadZ3 z3) => ExecTrace -> ExecTrace -> z3 (Maybe Z3.Model)
-solveTrace oldTrace trace = do
-  let newCons = init trace
-  let prevCons = if null oldTrace then [] else init oldTrace
+solveTrace oldTrace newTrace = do
+  let newCons = init newTrace
+  let oldCons = if null oldTrace then [] else init oldTrace
 
-  let prefix = commonPrefix prevCons newCons
-  let toDrop = length prevCons - length prefix
-  when (toDrop /= 0) $
-    Z3.solverPop (toDrop)
+  let prefix = prefixLength newCons oldCons
+  let toDrop = length oldCons - prefix
+  Z3.solverPop (toDrop)
 
-  assertTrace (drop (length prefix) newCons)
-  let (bool, MkBranch _ ast) = last trace
+  assertTrace (drop prefix newCons)
+  let (bool, MkBranch _ ast) = last newTrace
 
   isSAT <- Cond.new bool ast >>= Cond.check
   if isSAT
     then Just <$> Z3.solverGetModel
     else pure Nothing
   where
-    commonPrefix :: ExecTrace -> ExecTrace -> ExecTrace
-    commonPrefix _ [] = []
-    commonPrefix [] _ = []
-    commonPrefix (x : xs) (y : ys)
-      | x == y = y : commonPrefix xs ys
-      | otherwise = []
-
     -- Add all conditions enforced by the given 'ExecTrace' to
     -- the solver. Should only be called for n-1 elements of
     -- an 'ExecTrace'. As the last element is not a path condition.
     assertTrace [] = pure ()
     assertTrace t = do
       conds <- mapM (\(b, MkBranch _ c) -> Cond.new b c) t
-      -- liftIO $ putStrLn ("pushed: " ++ show (length conds))
       mapM_ (\c -> Z3.solverPush >> Cond.assert c) conds
 
 ------------------------------------------------------------------------
@@ -200,11 +190,11 @@ negateBranch (Node br (Just ifTrue) (Just ifFalse)) =
 -- returns a new execution tree, even if no satisfiable assignment
 -- was found.
 findUnexplored :: (Z3.MonadZ3 z3) => ExecTree -> ExecTrace -> z3 (Maybe Z3.Model, ExecTrace, ExecTree)
-findUnexplored tree oldTrace = do
+findUnexplored tree lastTrace = do
   case negateBranch tree of
     Nothing -> pure (Nothing, [], tree)
     Just nt -> do
       let nextTree = addTrace tree nt
-      solveTrace oldTrace nt >>= \case
+      solveTrace lastTrace nt >>= \case
         Nothing -> findUnexplored nextTree nt
         Just m -> pure (Just m, nt, nextTree)

@@ -73,7 +73,7 @@ runPath (BasicArgs memBegin size verbose putReg _) (mem, entry) store = do
   pure ret
 
 runAll :: ExecTrace -> Int -> BasicArgs -> EntryState -> S.Store -> Maybe ExecTree -> Z3.Z3 Int
-runAll t numPaths args es store tree = do
+runAll lastTrace numPaths args es store tree = do
   liftIO $ putStrLn ("Path" ++ show numPaths)
   trace <- runPath args es store
 
@@ -84,12 +84,12 @@ runAll t numPaths args es store tree = do
 
   -- nextTree is the execution tree with updated metadata for
   -- branch nodes which findUnexplored attempted to negate.
-  (model, oldTrace, nextTree) <- findUnexplored newTree t
+  (model, lastTrace', nextTree) <- findUnexplored newTree lastTrace
   case model of
     Nothing -> pure numPaths
     Just m -> do
       newStore <- S.fromModel m
-      runAll oldTrace (numPaths + 1) args es newStore (Just nextTree)
+      runAll lastTrace' (numPaths + 1) args es newStore (Just nextTree)
 
 ------------------------------------------------------------------------
 
