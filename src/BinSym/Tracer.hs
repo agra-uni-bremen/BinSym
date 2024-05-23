@@ -17,8 +17,9 @@ where
 
 import qualified BinSym.Cond as Cond
 import Control.Applicative ((<|>))
-import Data.Bifunctor (first)
-import System.Random (StdGen, getStdGen, setStdGen, split, uniform)
+import Control.Monad (when)
+import Control.Monad.IO.Class (liftIO)
+import System.Exit
 import qualified Z3.Monad as Z3
 
 -- Represents a branch condition in the executed code
@@ -61,28 +62,39 @@ appendCons trace cons = trace ++ [(True, MkBranch True cons)]
 -- For a given execution trace, return an assignment (represented
 -- as a 'Z3.Model') which statisfies all symbolic branch conditions.
 -- If such an assignment does not exist, then 'Nothing' is returned.
-solveTrace :: (Z3.MonadZ3 z3) => ExecTrace -> z3 (Maybe Z3.Model)
-solveTrace trace = do
-  assertTrace (init trace)
+solveTrace :: (Z3.MonadZ3 z3) => ExecTrace -> ExecTrace -> z3 (Maybe Z3.Model)
+solveTrace oldTrace trace = do
+  let newCons = init trace
+  let prevCons = if null oldTrace then [] else init oldTrace
+
+  let prefix = commonPrefix prevCons newCons
+  let toDrop = length prevCons - length prefix
+  when (toDrop /= 0) $
+    Z3.solverPop (toDrop)
+
+  assertTrace (drop (length prefix) newCons)
   let (bool, MkBranch _ ast) = last trace
 
   isSAT <- Cond.new bool ast >>= Cond.check
-  ret <-
-    if isSAT
-      then Just <$> Z3.solverGetModel
-      else pure Nothing
-
-  -- TODO: Potential optimization: Only pop the constraints from
-  -- the solver where the trace diverges from the previous trace.
-  Z3.solverReset >> pure ret
+  if isSAT
+    then Just <$> Z3.solverGetModel
+    else pure Nothing
   where
+    commonPrefix :: ExecTrace -> ExecTrace -> ExecTrace
+    commonPrefix _ [] = []
+    commonPrefix [] _ = []
+    commonPrefix (x : xs) (y : ys)
+      | x == y = y : commonPrefix xs ys
+      | otherwise = []
+
     -- Add all conditions enforced by the given 'ExecTrace' to
     -- the solver. Should only be called for n-1 elements of
     -- an 'ExecTrace'. As the last element is not a path condition.
     assertTrace [] = pure ()
     assertTrace t = do
       conds <- mapM (\(b, MkBranch _ c) -> Cond.new b c) t
-      mapM_ Cond.assert conds
+      -- liftIO $ putStrLn ("pushed: " ++ show (length conds))
+      mapM_ (\c -> Z3.solverPush >> Cond.assert c) conds
 
 ------------------------------------------------------------------------
 
@@ -168,52 +180,31 @@ addTrace Leaf trace = mkTree trace
 -- If further branches are to be negated, the resulting trace should
 -- be added to the 'ExecTree' using 'addTrace' to update the metadata
 -- in the tree as well.
-negateBranch :: StdGen -> ExecTree -> Maybe (ExecTrace, StdGen)
-negateBranch _ Leaf = Nothing
-negateBranch g (Node (MkBranch wasNeg ast) Nothing _)
+negateBranch :: ExecTree -> Maybe ExecTrace
+negateBranch Leaf = Nothing
+negateBranch (Node (MkBranch wasNeg ast) Nothing _)
   | wasNeg = Nothing
-  | otherwise = Just ([(True, MkBranch True ast)], g)
-negateBranch g (Node (MkBranch wasNeg ast) _ Nothing)
+  | otherwise = Just [(True, MkBranch True ast)]
+negateBranch (Node (MkBranch wasNeg ast) _ Nothing)
   | wasNeg = Nothing
-  | otherwise = Just ([(False, MkBranch True ast)], g)
-negateBranch g (Node br (Just ifTrue) (Just ifFalse)) =
-  -- Randomly traverse either the true or the false branch first.
-  -- Selecting the first unnegated node in the upper parts of the tree.
-  let (gt, gf) = split g'
-      truePath = negateBranch gt ifTrue
-      falsePath = negateBranch gf ifFalse
-   in makePath br True truePath `select` makePath br False falsePath
-  where
-    -- Prepend a new branch to a path through the binary tree.
-    makePath branch branchType path = first ((branchType, branch) :) <$> path
-
-    -- Obtain random boolean value to traverse either the true/false first.
-    (randValue, g') = uniform g :: (Bool, StdGen)
-
-    -- Version of (<|>) which randomly select either the LHS or the RHS first.
-    select
-      | randValue = (<|>)
-      | otherwise = flip (<|>)
+  | otherwise = Just [(False, MkBranch True ast)]
+negateBranch (Node br (Just ifTrue) (Just ifFalse)) =
+  do
+    -- TODO: Randomly prefer either the left or right child
+    (++) [(True, br)] <$> negateBranch ifTrue
+    <|> (++) [(False, br)] <$> negateBranch ifFalse
 
 -- Find an assignment (i.e. a 'Z3.Model') that causes exploration
 -- of a new execution path through the tested software. This
 -- function updates the metadata in the execution tree and thus
 -- returns a new execution tree, even if no satisfiable assignment
 -- was found.
-findUnexplored :: (Z3.MonadZ3 z3) => ExecTree -> z3 (Maybe Z3.Model, ExecTree)
-findUnexplored tree = do
-  -- TODO: Do not rely on the global random number generator here. Instead,
-  -- pass an 'StdGen' as an input State to this function. Ideally, use the
-  -- same 'StdGen' for generation of 'Concolic' values in 'BinSym.Store'.
-  stdgen <- getStdGen
-
-  case negateBranch stdgen tree of
-    Nothing -> pure (Nothing, tree)
-    Just (nt, stdgen') -> do
-      -- negateBranch used the random number generator, hence update it.
-      setStdGen stdgen'
-
+findUnexplored :: (Z3.MonadZ3 z3) => ExecTree -> ExecTrace -> z3 (Maybe Z3.Model, ExecTrace, ExecTree)
+findUnexplored tree oldTrace = do
+  case negateBranch tree of
+    Nothing -> pure (Nothing, [], tree)
+    Just nt -> do
       let nextTree = addTrace tree nt
-      solveTrace nt >>= \case
-        Nothing -> findUnexplored nextTree
-        Just m -> pure (Just m, nextTree)
+      solveTrace oldTrace nt >>= \case
+        Nothing -> findUnexplored nextTree nt
+        Just m -> pure (Just m, nt, nextTree)
