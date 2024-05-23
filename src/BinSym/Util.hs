@@ -5,6 +5,7 @@ module BinSym.Util
     fromBool,
     foldM1,
     copyArray,
+    prefixLength,
   )
 where
 
@@ -53,3 +54,14 @@ copyArray marr = do
   n <- getNumElements marr
   es <- mapM (unsafeRead marr) [0 .. n - 1]
   newListArray (l, u) es
+
+-- Determine the length of the common prefix of two lists.
+prefixLength :: (Eq a) => [a] -> [a] -> Int
+prefixLength = prefixLength' 0
+  where
+    prefixLength' :: (Eq a) => Int -> [a] -> [a] -> Int
+    prefixLength' n [] _ = n
+    prefixLength' n _ [] = n
+    prefixLength' n (x : xs) (y : ys)
+      | x == y = prefixLength' (n + 1) xs ys
+      | otherwise = n
