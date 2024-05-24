@@ -7,10 +7,9 @@ module BinSym.Tracer
     newExecTrace,
     appendBranch,
     appendCons,
-    BTree (..),
-    ExecTree,
-    mkTree,
-    addTrace,
+    Tracer,
+    newTracer,
+    trackTrace,
     findUnexplored,
   )
 where
@@ -18,7 +17,6 @@ where
 import qualified BinSym.Cond as Cond
 import BinSym.Util (prefixLength)
 import Control.Applicative ((<|>))
-import Data.List (unsnoc)
 import qualified Z3.Monad as Z3
 
 -- Represents a branch condition in the executed code
@@ -57,34 +55,6 @@ appendBranch trace wasTrue branch = trace ++ [(wasTrue, branch)]
 -- attempted for it.
 appendCons :: ExecTrace -> Z3.AST -> ExecTrace
 appendCons trace cons = trace ++ [(True, MkBranch True cons)]
-
--- For a given execution trace, return an assignment (represented
--- as a 'Z3.Model') which statisfies all symbolic branch conditions.
--- If such an assignment does not exist, then 'Nothing' is returned.
-solveTrace :: (Z3.MonadZ3 z3) => ExecTrace -> ExecTrace -> z3 (Maybe Z3.Model)
-solveTrace oldTrace newTrace = do
-  let newCons = init newTrace
-  let oldCons = if null oldTrace then [] else init oldTrace
-
-  let prefix = prefixLength newCons oldCons
-  let toDrop = length oldCons - prefix
-  Z3.solverPop (toDrop)
-
-  assertTrace (drop prefix newCons)
-  let (bool, MkBranch _ ast) = last newTrace
-
-  isSAT <- Cond.new bool ast >>= Cond.check
-  if isSAT
-    then Just <$> Z3.solverGetModel
-    else pure Nothing
-  where
-    -- Add all conditions enforced by the given 'ExecTrace' to
-    -- the solver. Should only be called for n-1 elements of
-    -- an 'ExecTrace'. As the last element is not a path condition.
-    assertTrace [] = pure ()
-    assertTrace t = do
-      conds <- mapM (\(b, MkBranch _ c) -> Cond.new b c) t
-      mapM_ (\c -> Z3.solverPush >> Cond.assert c) conds
 
 ------------------------------------------------------------------------
 
@@ -159,42 +129,86 @@ addTrace Leaf trace = mkTree trace
 
 ------------------------------------------------------------------------
 
--- Negate an unnegated branch in the execution tree and return an
--- 'ExecTrace' which leads to an unexplored execution path. If no
--- such path exists, then 'Nothing' is returned. If such a path
--- exists a concrete variable assignment for it can be calculated
--- using 'solveTrace'.
---
--- The branch node metadata in the resulting 'ExecTree' is updated
--- to reflect that negation of the selected branch node was attempted.
--- If further branches are to be negated, the resulting trace should
--- be added to the 'ExecTree' using 'addTrace' to update the metadata
--- in the tree as well.
-negateBranch :: ExecTree -> Maybe ExecTrace
-negateBranch Leaf = Nothing
-negateBranch (Node (MkBranch wasNeg ast) Nothing _)
-  | wasNeg = Nothing
-  | otherwise = Just [(True, MkBranch True ast)]
-negateBranch (Node (MkBranch wasNeg ast) _ Nothing)
-  | wasNeg = Nothing
-  | otherwise = Just [(False, MkBranch True ast)]
-negateBranch (Node br (Just ifTrue) (Just ifFalse)) =
-  do
-    -- TODO: Randomly prefer either the left or right child
-    (++) [(True, br)] <$> negateBranch ifTrue
-    <|> (++) [(False, br)] <$> negateBranch ifFalse
+-- The 'Tracer' encapsulates data for the Dynamic Symbolic Execution (DSE)
+-- algorithm. Specifically for path selection and incremental solving.
+data Tracer
+  = MkTracer
+      ExecTree -- The current execution tree for the DSE algorithm
+      ExecTrace -- The last solved trace, for incremental solving.
+
+-- Create a new empty 'Tracer' object without anything traced yet.
+newTracer :: Tracer
+newTracer = MkTracer (mkTree []) []
+
+-- Track a new 'ExecTrace' in the 'Tracer'.
+trackTrace :: Tracer -> ExecTrace -> Tracer
+trackTrace (MkTracer tree t) trace =
+  MkTracer (addTrace tree trace) t
+
+-- For a given execution trace, return an assignment (represented
+-- as a 'Z3.Model') which statisfies all symbolic branch conditions.
+-- If such an assignment does not exist, then 'Nothing' is returned.
+solveTrace :: (Z3.MonadZ3 z3) => Tracer -> ExecTrace -> z3 (Maybe Z3.Model)
+solveTrace (MkTracer _ oldTrace) newTrace = do
+  let newCons = init newTrace
+  let oldCons = if null oldTrace then [] else init oldTrace
+
+  let prefix = prefixLength newCons oldCons
+  let toDrop = length oldCons - prefix
+  Z3.solverPop toDrop
+
+  assertTrace (drop prefix newCons)
+  let (bool, MkBranch _ ast) = last newTrace
+
+  isSAT <- Cond.new bool ast >>= Cond.check
+  if isSAT
+    then Just <$> Z3.solverGetModel
+    else pure Nothing
+  where
+    -- Add all conditions enforced by the given 'ExecTrace' to
+    -- the solver. Should only be called for n-1 elements of
+    -- an 'ExecTrace'. As the last element is not a path condition.
+    assertTrace [] = pure ()
+    assertTrace t = do
+      conds <- mapM (\(b, MkBranch _ c) -> Cond.new b c) t
+      mapM_ (\c -> Z3.solverPush >> Cond.assert c) conds
 
 -- Find an assignment (i.e. a 'Z3.Model') that causes exploration
 -- of a new execution path through the tested software. This
 -- function updates the metadata in the execution tree and thus
 -- returns a new execution tree, even if no satisfiable assignment
 -- was found.
-findUnexplored :: (Z3.MonadZ3 z3) => ExecTree -> ExecTrace -> z3 (Maybe Z3.Model, ExecTrace, ExecTree)
-findUnexplored tree lastTrace = do
+findUnexplored :: (Z3.MonadZ3 z3) => Tracer -> z3 (Maybe Z3.Model, Tracer)
+findUnexplored tracer@(MkTracer tree _) = do
   case negateBranch tree of
-    Nothing -> pure (Nothing, [], tree)
+    Nothing -> pure (Nothing, tracer)
     Just nt -> do
-      let nextTree = addTrace tree nt
-      solveTrace lastTrace nt >>= \case
-        Nothing -> findUnexplored nextTree nt
-        Just m -> pure (Just m, nt, nextTree)
+      let nextTracer = MkTracer (addTrace tree nt) nt
+      solveTrace tracer nt >>= \case
+        Nothing -> findUnexplored nextTracer
+        Just m -> pure (Just m, nextTracer)
+  where
+    -- Negate an unnegated branch in the execution tree and return an
+    -- 'ExecTrace' which leads to an unexplored execution path. If no
+    -- such path exists, then 'Nothing' is returned. If such a path
+    -- exists a concrete variable assignment for it can be calculated
+    -- using 'solveTrace'.
+    --
+    -- The branch node metadata in the resulting 'ExecTree' is updated
+    -- to reflect that negation of the selected branch node was attempted.
+    -- If further branches are to be negated, the resulting trace should
+    -- be added to the 'ExecTree' using 'addTrace' to update the metadata
+    -- in the tree as well.
+    negateBranch :: ExecTree -> Maybe ExecTrace
+    negateBranch Leaf = Nothing
+    negateBranch (Node (MkBranch wasNeg ast) Nothing _)
+      | wasNeg = Nothing
+      | otherwise = Just [(True, MkBranch True ast)]
+    negateBranch (Node (MkBranch wasNeg ast) _ Nothing)
+      | wasNeg = Nothing
+      | otherwise = Just [(False, MkBranch True ast)]
+    negateBranch (Node br (Just ifTrue) (Just ifFalse)) =
+      do
+        -- TODO: Randomly prefer either the left or right child
+        (++) [(True, br)] <$> negateBranch ifTrue
+        <|> (++) [(False, br)] <$> negateBranch ifFalse
