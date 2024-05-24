@@ -150,13 +150,21 @@ trackTrace (MkTracer tree t) trace =
 -- If such an assignment does not exist, then 'Nothing' is returned.
 solveTrace :: (Z3.MonadZ3 z3) => Tracer -> ExecTrace -> z3 (Maybe Z3.Model)
 solveTrace (MkTracer _ oldTrace) newTrace = do
+  -- In an 'ExecTrace' we consider the first n-1 as the path constraits,
+  -- while the last element of an 'ExecTrace' is the condition that should
+  -- be solved.
   let newCons = init newTrace
   let oldCons = if null oldTrace then [] else init oldTrace
 
+  -- Determine the common prefix of the current trace and the old trace
+  -- drop constraints beyond this common prefix from the current solver
+  -- context. Thereby, keeping the common prefix and making use of Z3's
+  -- incremental solving capabilities.
   let prefix = prefixLength newCons oldCons
   let toDrop = length oldCons - prefix
   Z3.solverPop toDrop
 
+  -- Only enforce new constraints, i.e. those beyond the common prefix.
   assertTrace (drop prefix newCons)
   let (bool, MkBranch _ ast) = last newTrace
 
@@ -167,7 +175,7 @@ solveTrace (MkTracer _ oldTrace) newTrace = do
   where
     -- Add all conditions enforced by the given 'ExecTrace' to
     -- the solver. Should only be called for n-1 elements of
-    -- an 'ExecTrace'. As the last element is not a path condition.
+    -- an 'ExecTrace' (i.e. the constraints).
     assertTrace [] = pure ()
     assertTrace t = do
       conds <- mapM (\(b, MkBranch _ c) -> Cond.new b c) t
