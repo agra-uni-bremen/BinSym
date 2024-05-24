@@ -74,7 +74,7 @@ runPath (BasicArgs memBegin size verbose putReg _) (mem, entry) store = do
 
 runAll :: Tracer -> Int -> BasicArgs -> EntryState -> S.Store -> Z3.Z3 Int
 runAll tracer numPaths args es store = do
-  liftIO $ putStrLn ("Path" ++ show numPaths)
+  liftIO $ putStrLn $ "\n##\n# " ++ show numPaths ++ "th concolic execution\n##\n"
   trace <- runPath args es store
 
   -- tracer' includes the trace of the last path.
@@ -85,6 +85,7 @@ runAll tracer numPaths args es store = do
     Nothing -> pure numPaths
     Just m -> do
       newStore <- S.fromModel m
+      liftIO $ putStrLn ("\nNext assignment:\n" ++ show newStore)
       runAll nextTracer (numPaths + 1) args es newStore
 
 ------------------------------------------------------------------------
