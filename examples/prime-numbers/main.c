@@ -34,7 +34,7 @@ main(void)
 	register int number asm("a3");
 
 	make_symbolic(&a, sizeof(a));
-	if (a <= 10) {
+	if (a <= 100) {
 		if (a > 1 && first_divisor(a) == a) {
 			is_prime = 1;
 			number = a;
