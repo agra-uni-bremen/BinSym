@@ -10,6 +10,9 @@ module BinSym.Tracer
     Tracer,
     newTracer,
     trackTrace,
+    BTree (..),
+    mkTree,
+    addTrace,
     findUnexplored,
   )
 where
