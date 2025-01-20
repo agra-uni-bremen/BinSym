@@ -66,15 +66,15 @@ have been integrated with BinSym yet.
 
 ## How To Cite
 
-This work is still ongoing, a preprint is [available on arXiv](https://doi.org/10.48550/arXiv.2404.04132):
+This work will be published in the proceedings of [DATE'25](https://date-conference.com), a [pre-print](https://www.ibr.cs.tu-bs.de/vss/Publications/2025/tempel_25_binsym.pdf) is available.
 
 ```
 @misc{tempel2024binsym,
-	author = {Sören Tempel and Tobias Brandt and Christoph Lüth and Rolf Drechsler},
-	title  = {BinSym: Binary-Level Symbolic Execution using Formal Descriptions of Instruction Semantics},
-	year   = {2024},
-	month  = apr,
-	doi    = {10.48550/arXiv.1801.02833},
+	author    = {Sören Tempel and Tobias Brandt and Christoph Lüth and Christian Dietrich and Rolf Drechsler},
+	booktitle = {2025 Design, Automation \& Test in Europe Conference \& Exhibition (DATE)}
+	title     = {Accurate and Extensible Symbolic Execution of Binary Code based on Formal ISA Semantics},
+	year      = {2025},
+	url       = {https://www.ibr.cs.tu-bs.de/vss/Publications/2025/tempel_25_binsym.pdf},
 }
 ```
 
