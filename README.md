@@ -2,7 +2,7 @@
 
 Symbolic execution of [RISC-V] binary code based on formal instruction semantics.
 
-**More information:** https://doi.org/10.48550/arXiv.2404.04132
+**More information:** https://doi.org/10.23919/DATE64628.2025.10993257
 
 ## About
 
@@ -66,7 +66,7 @@ have been integrated with BinSym yet.
 
 ## How To Cite
 
-This work will be published in the proceedings of [DATE'25](https://date-conference.com), a [pre-print](https://www.ibr.cs.tu-bs.de/vss/Publications/2025/tempel_25_binsym.pdf) is available.
+This work was published in the [proceedings of DATE'25](https://doi.org/10.23919/DATE64628.2025.10993257), it can be cited as follows:
 
 ```
 @misc{tempel2024binsym,
@@ -74,7 +74,7 @@ This work will be published in the proceedings of [DATE'25](https://date-confere
 	booktitle = {2025 Design, Automation \& Test in Europe Conference \& Exhibition (DATE)}
 	title     = {Accurate and Extensible Symbolic Execution of Binary Code based on Formal ISA Semantics},
 	year      = {2025},
-	url       = {https://www.ibr.cs.tu-bs.de/vss/Publications/2025/tempel_25_binsym.pdf},
+	doi       = {10.23919/DATE64628.2025.10993257},
 }
 ```
 
